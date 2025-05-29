@@ -19,15 +19,17 @@ public class PedidoController {
 
     @GetMapping
     public List<PedidoDTO> listarPedidos() {
-        List<Pedido> pedidos = planificadorService.getPedidos(); // asumimos que se expone esta lista
+        List<Pedido> pedidos = planificadorService.getPedidos();
         return pedidos.stream()
                 .map(p -> new PedidoDTO(
-                        p.getIdCliente(), // reemplazar por el método correcto
-                        p.getPosX(),         // coordenada X
-                        p.getPosY(),         // coordenada Y
-                        p.getVolumen(),   // volumen en m3
-                        p.getPlazoHoras() // plazo de entrega
+                        p.getFechaHoraCreacion(), // nuevo campo
+                        p.getIdCliente(),
+                        p.getPosX(),
+                        p.getPosY(),
+                        p.getVolumen(),
+                        p.getPlazoHoras()
                 ))
                 .collect(Collectors.toList());
     }
+
 }
