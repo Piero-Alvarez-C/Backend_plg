@@ -22,7 +22,7 @@ public class PedidoController {
         List<Pedido> pedidos = planificadorService.getPedidos();
         return pedidos.stream()
                 .map(p -> new PedidoDTO(
-                        p.getFechaHoraCreacion(), // nuevo campo
+                        p.getFechaHoraCreacion(),
                         p.getIdCliente(),
                         p.getPosX(),
                         p.getPosY(),
@@ -31,5 +31,4 @@ public class PedidoController {
                 ))
                 .collect(Collectors.toList());
     }
-
 }

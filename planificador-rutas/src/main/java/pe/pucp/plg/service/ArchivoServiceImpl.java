@@ -27,12 +27,6 @@ public class ArchivoServiceImpl implements ArchivoService {
             switch (tipo) {
                 case PEDIDOS -> {
                     List<Pedido> pedidos = ParseadorArchivos.parsearPedidos(contenido);
-                    pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 10, 0),
-                            45, 43, "c-123", 9, 36));
-                    pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 12, 30),
-                            30, 20, "c-456", 15, 24));
-                    pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 13, 15),
-                            50, 10, "c-789", 5, 12));
                     planificadorService.setPedidos(pedidos);
                 }
                 case MANTENIMIENTOS -> {

@@ -4,15 +4,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.model.*;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class PlanificadorServiceImpl implements PlanificadorService {
 
-    private List<Pedido> pedidos;
-    private List<Mantenimiento> mantenimientos;
-    private List<Bloqueo> bloqueos;
-    private List<Averia> averias;
+    private List<Pedido> pedidos = new ArrayList<>();
+    private List<Mantenimiento> mantenimientos = new ArrayList<>();
+    private List<Bloqueo> bloqueos = new ArrayList<>();
+    private List<Averia> averias = new ArrayList<>();
     @Autowired
     private CamionService camionService;
 
@@ -50,6 +52,12 @@ public class PlanificadorServiceImpl implements PlanificadorService {
         System.out.println("Bloqueos: " + bloqueos.size());
         System.out.println("Averías: " + averias.size());
         System.out.println("Camiones: " + camiones.size());
+        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 10, 0),
+                45, 43, "c-123", 9, 36));
+        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 12, 30),
+                30, 20, "c-456", 15, 24));
+        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 13, 15),
+                50, 10, "c-789", 5, 12));
 
 
         // Aquí llamas a tu algoritmo metaheurístico (por ejemplo, ACO)
