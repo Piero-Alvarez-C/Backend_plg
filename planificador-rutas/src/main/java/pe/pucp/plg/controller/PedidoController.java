@@ -23,10 +23,10 @@ public class PedidoController {
         return pedidos.stream()
                 .map(p -> new PedidoDTO(
                         p.getIdCliente(), // reemplazar por el método correcto
-                        p.getX(),         // coordenada X
-                        p.getY(),         // coordenada Y
+                        p.getPosX(),         // coordenada X
+                        p.getPosY(),         // coordenada Y
                         p.getVolumen(),   // volumen en m3
-                        p.getHorasLimite() // plazo de entrega
+                        p.getPlazoHoras() // plazo de entrega
                 ))
                 .collect(Collectors.toList());
     }
