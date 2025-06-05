@@ -6,29 +6,42 @@ import java.time.LocalDateTime;
 
 public class PedidoDTO {
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm")
-    private LocalDateTime fechaHoraCreacion;
+    private int id;
+    private String idCliente; // ← agrega esto
+    private int x;
+    private int y;
+    private int tiempoCreacion;
+    private int tiempoLimite;
+    private double volumen;
+    private boolean atendido;
+    private boolean descartado;
 
-    private String idCliente;
-    private int posX;
-    private int posY;
-    private int volumenM3;
-    private int horasLimite;
+    // Getters y Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
-    public PedidoDTO(LocalDateTime fechaHoraCreacion, String idCliente, int posX, int posY, int volumenM3, int horasLimite) {
-        this.fechaHoraCreacion = fechaHoraCreacion;
-        this.idCliente = idCliente;
-        this.posX = posX;
-        this.posY = posY;
-        this.volumenM3 = volumenM3;
-        this.horasLimite = horasLimite;
-    }
-
-    // Getters
-    public LocalDateTime getFechaHoraCreacion() { return fechaHoraCreacion; }
     public String getIdCliente() { return idCliente; }
-    public int getPosX() { return posX; }
-    public int getPosY() { return posY; }
-    public int getVolumenM3() { return volumenM3; }
-    public int getHorasLimite() { return horasLimite; }
+    public void setIdCliente(String idCliente) { this.idCliente = idCliente; }
+
+    public int getX() { return x; }
+    public void setX(int x) { this.x = x; }
+
+    public int getY() { return y; }
+    public void setY(int y) { this.y = y; }
+
+    public int getTiempoCreacion() { return tiempoCreacion; }
+    public void setTiempoCreacion(int tiempoCreacion) { this.tiempoCreacion = tiempoCreacion; }
+
+    public int getTiempoLimite() { return tiempoLimite; }
+    public void setTiempoLimite(int tiempoLimite) { this.tiempoLimite = tiempoLimite; }
+
+    public double getVolumen() { return volumen; }
+    public void setVolumen(double volumen) { this.volumen = volumen; }
+
+    public boolean isAtendido() { return atendido; }
+    public void setAtendido(boolean atendido) { this.atendido = atendido; }
+
+    public boolean isDescartado() { return descartado; }
+    public void setDescartado(boolean descartado) { this.descartado = descartado; }
+
 }

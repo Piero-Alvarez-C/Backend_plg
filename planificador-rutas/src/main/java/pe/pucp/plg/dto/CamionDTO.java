@@ -1,28 +1,37 @@
 package pe.pucp.plg.dto;
 
 public class CamionDTO {
-    private String codigo;
-    private String tipo;
-    private double capacidadM3;
-    private double pesoTotalTon;
-
-    public CamionDTO(String codigo, String tipo, double capacidadM3, double pesoTotalTon) {
-        this.codigo = codigo;
-        this.tipo = tipo;
-        this.capacidadM3 = capacidadM3;
-        this.pesoTotalTon = pesoTotalTon;
-    }
+    private String id;
+    private int x;
+    private int y;
+    private double disponible;
+    private double combustibleDisponible;
+    private String status;
+    private double consumoAcumulado;
 
     // Getters y Setters
-    public String getCodigo() { return codigo; }
-    public void setCodigo(String codigo) { this.codigo = codigo; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public String getTipo() { return tipo; }
-    public void setTipo(String tipo) { this.tipo = tipo; }
+    public int getX() { return x; }
+    public void setX(int x) { this.x = x; }
 
-    public double getCapacidadM3() { return capacidadM3; }
-    public void setCapacidadM3(double capacidadM3) { this.capacidadM3 = capacidadM3; }
+    public int getY() { return y; }
+    public void setY(int y) { this.y = y; }
 
-    public double getPesoTotalTon() { return pesoTotalTon; }
-    public void setPesoTotalTon(double pesoTotalTon) { this.pesoTotalTon = pesoTotalTon; }
+    public double getDisponible() { return disponible; }
+    public void setDisponible(double disponible) { this.disponible = disponible; }
+
+    public double getCombustibleDisponible() { return combustibleDisponible; }
+    public void setCombustibleDisponible(double combustibleDisponible) {
+        this.combustibleDisponible = combustibleDisponible;
+    }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public double getConsumoAcumulado() { return consumoAcumulado; }
+    public void setConsumoAcumulado(double consumoAcumulado) {
+        this.consumoAcumulado = consumoAcumulado;
+    }
 }

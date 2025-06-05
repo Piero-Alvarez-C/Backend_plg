@@ -3,69 +3,34 @@ package pe.pucp.plg.model;
 import java.time.LocalDateTime;
 
 public class Pedido {
-    private LocalDateTime fechaHoraCreacion;
-    private int posX;
-    private int posY;
-    private String idCliente;
-    private int volumen;       // en m3
-    private int plazoHoras;    // plazo máximo
+    int id, x, y, tiempoCreacion, tiempoLimite;
+    double volumen;
+    boolean atendido = false;
+    boolean descartado = false;
+    boolean programado = false;   // ⬅ Nuevo campo
 
-    public Pedido() {}
-
-    public Pedido(LocalDateTime fechaHoraCreacion, int posX, int posY, String idCliente, int volumen, int plazoHoras) {
-        this.fechaHoraCreacion = fechaHoraCreacion;
-        this.posX = posX;
-        this.posY = posY;
-        this.idCliente = idCliente;
-        this.volumen = volumen;
-        this.plazoHoras = plazoHoras;
+    public Pedido(int id, int tiempoCreacion, int x, int y, double volumen, int tiempoLimite) {
+        this.id = id; this.tiempoCreacion = tiempoCreacion;
+        this.x = x; this.y = y; this.volumen = volumen;
+        this.tiempoLimite = tiempoLimite;
     }
-
-    public LocalDateTime getFechaHoraCreacion() {
-        return fechaHoraCreacion;
+    // → getters para la tabla de pedidos:
+    public int getId() { return id; }
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public double getVolumen() { return volumen; }
+    public int getTiempoLimite() { return tiempoLimite; }
+    public boolean isAtendido() { return atendido; }
+    public boolean isDescartado() {
+        return descartado;
     }
-
-    public void setFechaHoraCreacion(LocalDateTime fechaHoraCreacion) {
-        this.fechaHoraCreacion = fechaHoraCreacion;
+    public boolean isProgramado() {return programado; }
+    public int getTiempoCreacion() { return tiempoCreacion; }
+    public void setTiempoCreacion(int tc) {this.tiempoCreacion = tc; }
+    public void setDescartado(boolean descartado) {
+        this.descartado = descartado;
     }
-
-    public int getPosX() {
-        return posX;
-    }
-
-    public void setPosX(int posX) {
-        this.posX = posX;
-    }
-
-    public int getPosY() {
-        return posY;
-    }
-
-    public void setPosY(int posY) {
-        this.posY = posY;
-    }
-
-    public String getIdCliente() {
-        return idCliente;
-    }
-
-    public void setIdCliente(String idCliente) {
-        this.idCliente = idCliente;
-    }
-
-    public int getVolumen() {
-        return volumen;
-    }
-
-    public void setVolumen(int volumen) {
-        this.volumen = volumen;
-    }
-
-    public int getPlazoHoras() {
-        return plazoHoras;
-    }
-
-    public void setPlazoHoras(int plazoHoras) {
-        this.plazoHoras = plazoHoras;
-    }
+    // → marcar como atendido:
+    public void setProgramado(boolean programado) {this.programado = programado; }
+    public void setAtendido(boolean a) { this.atendido = a; }
 }

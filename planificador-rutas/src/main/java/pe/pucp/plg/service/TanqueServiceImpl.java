@@ -1,7 +1,9 @@
 package pe.pucp.plg.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.model.Tanque;
+import pe.pucp.plg.state.SimulacionEstado;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,16 +11,31 @@ import java.util.List;
 @Service
 public class TanqueServiceImpl implements TanqueService {
 
-    private final List<Tanque> tanques = new ArrayList<>();
+    @Autowired
+    private SimulacionEstado simulacionEstado;
 
-    public TanqueServiceImpl() {
-        tanques.add(new Tanque("Almacén Principal", 12, 8, Double.POSITIVE_INFINITY, true));
-        tanques.add(new Tanque("Tanque Intermedio Norte", 42, 42, 50.0, false));
-        tanques.add(new Tanque("Tanque Intermedio Este", 63, 3, 10.0, false));
+    @Override
+    public void reset(Tanque tanque) {
+        tanque.setDisponible(tanque.getCapacidadTotal());
     }
 
     @Override
-    public List<Tanque> obtenerTanques() {
-        return tanques;
+    public boolean puedeAbastecer(Tanque tanque, double volumen) {
+        return tanque.getDisponible() >= volumen;
+    }
+
+    @Override
+    public void reducirCapacidad(Tanque tanque, double volumen) {
+        double nuevaCapacidad = tanque.getDisponible() - volumen;
+        if (nuevaCapacidad < 0) nuevaCapacidad = 0;
+        tanque.setDisponible(nuevaCapacidad);
+    }
+
+    @Override
+    public Tanque obtenerPorPosicion(int x, int y) {
+        return simulacionEstado.getTanques().stream()
+                .filter(t -> t.getPosX() == x && t.getPosY() == y)
+                .findFirst()
+                .orElse(null);
     }
 }
