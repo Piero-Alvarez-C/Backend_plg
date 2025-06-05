@@ -44,20 +44,20 @@ public class PlanificadorServiceImpl implements PlanificadorService {
 
     @Override
     public void ejecutarPlanificacion() {
-        List<Camion> camiones = camionService.getFlota();
+        //List<Camion> camiones = camionService.getFlota();
 
         System.out.println("> Ejecutando algoritmo de planificación...");
         System.out.println("Pedidos: " + pedidos.size());
         System.out.println("Mantenimientos: " + mantenimientos.size());
         System.out.println("Bloqueos: " + bloqueos.size());
         System.out.println("Averías: " + averias.size());
-        System.out.println("Camiones: " + camiones.size());
-        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 10, 0),
-                45, 43, "c-123", 9, 36));
-        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 12, 30),
-                30, 20, "c-456", 15, 24));
-        pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 13, 15),
-                50, 10, "c-789", 5, 12));
+        //System.out.println("Camiones: " + camiones.size());
+        //pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 10, 0),
+        //        45, 43, "c-123", 9, 36));
+        //pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 12, 30),
+        //        30, 20, "c-456", 15, 24));
+        // pedidos.add(new Pedido(LocalDateTime.of(2025, 5, 29, 13, 15),
+        //        50, 10, "c-789", 5, 12));
 
 
         // Aquí llamas a tu algoritmo metaheurístico (por ejemplo, ACO)

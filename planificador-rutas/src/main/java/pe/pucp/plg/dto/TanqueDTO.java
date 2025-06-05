@@ -1,23 +1,21 @@
 package pe.pucp.plg.dto;
 
 public class TanqueDTO {
-    private String nombre;
     private int posX;
     private int posY;
-    private double capacidadM3;
-    private boolean principal;
+    private double capacidadTotal;
+    private double capacidadDisponible;
 
-    public TanqueDTO(String nombre, int posX, int posY, double capacidadM3, boolean principal) {
-        this.nombre = nombre;
-        this.posX = posX;
-        this.posY = posY;
-        this.capacidadM3 = capacidadM3;
-        this.principal = principal;
-    }
-
-    public String getNombre() { return nombre; }
+    // Getters y setters
     public int getPosX() { return posX; }
+    public void setPosX(int posX) { this.posX = posX; }
+
     public int getPosY() { return posY; }
-    public double getCapacidadM3() { return capacidadM3; }
-    public boolean isPrincipal() { return principal; }
+    public void setPosY(int posY) { this.posY = posY; }
+
+    public double getCapacidadTotal() { return capacidadTotal; }
+    public void setCapacidadTotal(double capacidadTotal) { this.capacidadTotal = capacidadTotal; }
+
+    public double getCapacidadDisponible() { return capacidadDisponible; }
+    public void setCapacidadDisponible(double capacidadDisponible) { this.capacidadDisponible = capacidadDisponible; }
 }
