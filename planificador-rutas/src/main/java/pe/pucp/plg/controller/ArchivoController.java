@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 import pe.pucp.plg.dto.ArchivoTipo;
 import pe.pucp.plg.service.ArchivoService;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/archivos")
 public class ArchivoController {

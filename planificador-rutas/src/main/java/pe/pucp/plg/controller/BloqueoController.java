@@ -11,6 +11,7 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/bloqueos")
 public class BloqueoController {
@@ -21,7 +22,7 @@ public class BloqueoController {
     public ResponseEntity<List<BloqueoDTO>> listarBloqueos() {
         List<Bloqueo> bloqueos = simulacionEstado.getBloqueos();
         List<BloqueoDTO> lista = bloqueos.stream()
-                .map(MapperUtil::toDTO)
+                .map(MapperUtil::toBloqueoDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }

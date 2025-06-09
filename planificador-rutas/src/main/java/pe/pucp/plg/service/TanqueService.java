@@ -8,4 +8,5 @@ public interface TanqueService {
     boolean puedeAbastecer(Tanque tanque, double volumen);
     void reducirCapacidad(Tanque tanque, double volumen);
     Tanque obtenerPorPosicion(int x, int y);
+    List<Tanque> listarTodos();
 }

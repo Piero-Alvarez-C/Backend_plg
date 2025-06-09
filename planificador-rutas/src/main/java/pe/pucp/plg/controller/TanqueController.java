@@ -12,6 +12,7 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/tanques")
 public class TanqueController {
@@ -22,7 +23,7 @@ public class TanqueController {
     @GetMapping
     public ResponseEntity<List<TanqueDTO>> obtenerTanques() {
         List<TanqueDTO> lista = simulacionEstado.getTanques().stream()
-                .map(MapperUtil::toDTO)
+                .map(MapperUtil::toTanqueDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }

@@ -11,5 +11,5 @@ public interface CamionService {
     void moverA(Camion camion, Point p);
     void setRuta(Camion camion, List<Point> ruta);
     void appendToHistory(Camion camion, List<Point> path);
-
+    List<Camion> listarTodos();
 }

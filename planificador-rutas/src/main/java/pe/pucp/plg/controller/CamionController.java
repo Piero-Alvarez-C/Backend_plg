@@ -12,6 +12,7 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/camiones")
 public class CamionController {
@@ -25,7 +26,7 @@ public class CamionController {
     @GetMapping
     public ResponseEntity<List<CamionDTO>> listarCamiones() {
         List<CamionDTO> lista = simulacionEstado.getCamiones().stream()
-                .map(MapperUtil::toDTO)
+                .map(MapperUtil::toCamionDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }

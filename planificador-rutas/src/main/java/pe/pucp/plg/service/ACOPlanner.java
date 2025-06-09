@@ -21,6 +21,8 @@ public class ACOPlanner {
     private static final double Q = 100.0;     // feromona depositada
 
     @Autowired
+    private CamionService camionService;
+    @Autowired
     private SimulacionEstado estado;
 
     // ------------------------------------------------------------
@@ -369,8 +371,10 @@ public class ACOPlanner {
     // 13) Un minuto de simulación completo
     // ------------------------------------------------------------
     public int stepOneMinute() {
-        int tiempoActual = estado.getCurrentTime();
-
+        // corregido
+        int nuevoTiempo = estado.getCurrentTime() + 1;
+        estado.setCurrentTime(nuevoTiempo);
+        int tiempoActual = nuevoTiempo;
         boolean replanificar = (tiempoActual == 0);
 
         // 1) Recarga de tanques intermedios cada vez que currentTime % 1440 == 0 (inicio de día)
@@ -451,15 +455,13 @@ public class ACOPlanner {
                         tiempoActual, ev.camion.getId(), destX, destY, distMin);
             }
         }
-
         // 4) Avanzar cada camión en ruta (ida o retorno) un paso
         for (Camion c : estado.getCamiones()) {
             if (c.tienePasosPendientes()) {
-                // notar: usas CamionService para avanzar un paso
-                // c.avanzarUnPaso();  // Antes era método en CamionServiceImpl
-                // Aquí: inyectar CamionService y llamar avanzarUnPaso(c)
+                // Llamada a CamionService para que el camión avance UN paso en su rutaActual
+                camionService.avanzarUnPaso(c);
             } else if (c.getStatus() == Camion.TruckStatus.RETURNING) {
-                // lógic a de recarga automática al llegar a depósito
+                // lógica de recarga automática al llegar a depósito (queda igual)
                 double falta = c.getCapacidad() - c.getDisponible();
                 Tanque tq = c.getReabastecerEnTanque();
                 if (tq != null) {
@@ -480,20 +482,64 @@ public class ACOPlanner {
             }
         }
 
+
         // 5) Incorporar nuevos pedidos que llegan en este minuto
-        List<Pedido> nuevos = estado.getPedidosPorTiempo()
-                .getOrDefault(tiempoActual, Collections.emptyList());
+        List<Pedido> nuevos = estado.getPedidosPorTiempo().remove(tiempoActual);
+        if (nuevos == null) {
+            nuevos = Collections.emptyList();
+        }
+
+        // 5.a) Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
+        double capacidadMaxCamion = estado.getCamiones().stream()
+                .mapToDouble(Camion::getCapacidad)   // o getDisponible() si prefieres la disponible inicial
+                .max()
+                .orElse(0);
+
+        List<Pedido> pedidosAInyectar = new ArrayList<>();
         for (Pedido p : nuevos) {
+            double volumenRestante = p.getVolumen();
+
+            if (volumenRestante > capacidadMaxCamion) {
+                // 🛠️ Dividir en sub-pedidos de ≤ capacidadMaxCamion
+                while (volumenRestante > 0) {
+                    double vol = Math.min(capacidadMaxCamion, volumenRestante);
+                    int subId = estado.generateUniquePedidoId();
+                    Pedido sub = new Pedido(
+                            subId,
+                            tiempoActual,
+                            p.getX(),
+                            p.getY(),
+                            vol,
+                            p.getTiempoLimite()
+                    );
+                    pedidosAInyectar.add(sub);
+                    volumenRestante -= vol;
+                }
+            } else {
+                // cabe entero en un camión
+                pedidosAInyectar.add(p);
+            }
+        }
+
+        // 5.b) Añadir realmente los pedidos (reemplazo de los nuevos originales)
+        estado.getPedidos().addAll(pedidosAInyectar);
+
+        for (Pedido p : pedidosAInyectar) {
             System.out.printf("🆕 t+%d: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite t+%d)%n",
                     tiempoActual, p.getId(), p.getX(), p.getY(), p.getVolumen(), p.getTiempoLimite());
         }
-        if (!nuevos.isEmpty()) replanificar = true;
+        if (!pedidosAInyectar.isEmpty()) replanificar = true;
 
         // 6) Comprobar colapso: pedidos vencidos
-        for (Pedido p : estado.getPedidos()) {
+        Iterator<Pedido> itP = estado.getPedidos().iterator();
+        while (itP.hasNext()) {
+            Pedido p = itP.next();
             if (!p.isAtendido() && !p.isDescartado() && tiempoActual > p.getTiempoLimite()) {
-                System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n", tiempoActual, p.getId());
-                return estado.getCurrentTime();
+                System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
+                        tiempoActual, p.getId());
+                // Marca y elimina para no repetir el colapso
+                p.setDescartado(true);
+                itP.remove();
             }
         }
 
@@ -601,9 +647,8 @@ public class ACOPlanner {
                             .collect(Collectors.toList()));
 
             aplicarRutas(tiempoActual, rutas, candidatos);
+            estado.setRutas(rutas);
         }
-
-        estado.setCurrentTime(tiempoActual + 1);
         return estado.getCurrentTime();
     }
 

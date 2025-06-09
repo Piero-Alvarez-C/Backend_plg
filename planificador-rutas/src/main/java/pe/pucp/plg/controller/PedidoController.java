@@ -12,6 +12,7 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/pedidos")
 public class PedidoController {
@@ -25,7 +26,7 @@ public class PedidoController {
     @GetMapping
     public ResponseEntity<List<PedidoDTO>> listarPedidos() {
         List<PedidoDTO> lista = simulacionEstado.getPedidos().stream()
-                .map(MapperUtil::toDTO)
+                .map(MapperUtil::toPedidoDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }
