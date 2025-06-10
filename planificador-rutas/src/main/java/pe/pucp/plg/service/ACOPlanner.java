@@ -306,7 +306,7 @@ public class ACOPlanner {
     // ------------------------------------------------------------
     private boolean isBlockedMove(Point prev, Point next, int timeMin) {
         for (Bloqueo b : estado.getBloqueos()) {
-            if (b.coversSegment(prev, next) && b.estaBloqueado(timeMin, prev)) {
+            if (b.coversSegment(prev, next) && b.estaBloqueado(timeMin, next)) {
                 return true;
             }
         }
@@ -449,6 +449,7 @@ public class ACOPlanner {
 
                 List<Point> returnPath = buildManhattanPath(sx, sy, destX, destY, tiempoActual);
                 ev.camion.setRutaActual(returnPath);
+                ev.camion.setPasoActual(0);
                 ev.camion.getHistory().addAll(returnPath);
 
                 System.out.printf("⏱️ t+%d: Camión %s inicia retorno a (%d,%d) dist=%d%n",
@@ -785,6 +786,7 @@ public class ACOPlanner {
                     int tViaje = (int) Math.ceil(dist * (60.0 / 50.0));
 
                     camion.setRutaActual(path);
+                    camion.setPasoActual(0);
                     camion.getHistory().addAll(path);
                     p.setProgramado(true);
 
@@ -793,10 +795,10 @@ public class ACOPlanner {
                     ));
                     System.out.printf("🕒 eventoEntrega programado t+%d → (%d,%d)%n",
                             tiempoActual + tViaje, p.getX(), p.getY());
-
-                    camion.setX(p.getX());
-                    camion.setY(p.getY());
-                    cx = p.getX(); cy = p.getY();
+                    Point last = path.get(path.size() - 1);
+                    // camion.setX(p.getX());
+                    // camion.setY(p.getY());
+                    cx = last.x;; cy = last.y;
                 }
             }
         }
