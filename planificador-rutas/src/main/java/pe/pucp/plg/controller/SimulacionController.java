@@ -3,10 +3,7 @@ package pe.pucp.plg.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import pe.pucp.plg.dto.BloqueoDTO;
-import pe.pucp.plg.dto.CamionDTO;
-import pe.pucp.plg.dto.PedidoDTO;
-import pe.pucp.plg.dto.TanqueDTO;
+import pe.pucp.plg.dto.*;
 import pe.pucp.plg.model.Camion;
 import pe.pucp.plg.model.Tanque;
 import pe.pucp.plg.service.CamionService;
@@ -18,6 +15,7 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/simulacion")
 public class SimulacionController {
@@ -41,60 +39,51 @@ public class SimulacionController {
     // 2) Avanzar un minuto de simulación
     // ------------------------------------------------------------
     @PostMapping("/step")
-    public ResponseEntity<Integer> step() {
+    public ResponseEntity<SimulacionSnapshotDTO> step() {
         int nuevoTiempo = simulacionService.stepOneMinute();
-        return ResponseEntity.ok(nuevoTiempo);
-    }
 
+        SimulacionSnapshotDTO snapshot = new SimulacionSnapshotDTO();
+        snapshot.setTiempoActual(nuevoTiempo);
+
+        snapshot.setCamiones(
+                estado.getCamiones().stream()
+                        .map(MapperUtil::toCamionDTO)
+                        .collect(Collectors.toList())
+        );
+
+        snapshot.setPedidos(
+                estado.getPedidos().stream()
+                        .filter(p -> !p.isAtendido() && !p.isDescartado())
+                        .map(MapperUtil::toPedidoDTO)
+                        .collect(Collectors.toList())
+        );
+
+        snapshot.setBloqueos(
+                estado.getBloqueos().stream()
+                        .map(MapperUtil::toBloqueoDTO)
+                        .collect(Collectors.toList())
+        );
+
+        snapshot.setTanques(
+                estado.getTanques().stream()
+                        .map(MapperUtil::toTanqueDTO)
+                        .collect(Collectors.toList())
+        );
+
+        snapshot.setRutas(
+                estado.getRutas().stream()
+                        .map(MapperUtil::toRutaDTO)
+                        .collect(Collectors.toList())
+        );
+
+        return ResponseEntity.ok(snapshot);
+    }
     // ------------------------------------------------------------
     // 3) Obtener tiempo actual
     // ------------------------------------------------------------
     @GetMapping("/time")
     public ResponseEntity<Integer> getTime() {
-        return ResponseEntity.ok(simulacionService.getTiempoActual());
+        return ResponseEntity.ok(estado.getCurrentTime());
     }
 
-    // ------------------------------------------------------------
-    // 4) Obtener lista de camiones (DTO)
-    // ------------------------------------------------------------
-    @GetMapping("/camiones")
-    public ResponseEntity<List<CamionDTO>> listarCamiones() {
-        List<CamionDTO> lista = estado.getCamiones().stream()
-                .map(MapperUtil::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(lista);
-    }
-
-    // ------------------------------------------------------------
-    // 5) Obtener lista de tanques (DTO)
-    // ------------------------------------------------------------
-    @GetMapping("/tanques")
-    public ResponseEntity<List<TanqueDTO>> listarTanques() {
-        List<TanqueDTO> lista = estado.getTanques().stream()
-                .map(MapperUtil::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(lista);
-    }
-
-    // ------------------------------------------------------------
-    // 6) Obtener lista de pedidos (DTO)
-    // ------------------------------------------------------------
-    @GetMapping("/pedidos")
-    public ResponseEntity<List<PedidoDTO>> listarPedidos() {
-        List<PedidoDTO> lista = estado.getPedidos().stream()
-                .map(MapperUtil::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(lista);
-    }
-
-    // ------------------------------------------------------------
-    // 7) Obtener lista de bloqueos (DTO)
-    // ------------------------------------------------------------
-    @GetMapping("/bloqueos")
-    public ResponseEntity<List<BloqueoDTO>> listarBloqueos() {
-        List<BloqueoDTO> lista = estado.getBloqueos().stream()
-                .map(MapperUtil::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(lista);
-    }
 }

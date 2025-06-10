@@ -1,11 +1,14 @@
 package pe.pucp.plg.util;
 
 import pe.pucp.plg.model.*;
+import pe.pucp.plg.service.BloqueoServiceImpl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
+
 
 public class ParseadorArchivos {
 
@@ -43,21 +46,30 @@ public class ParseadorArchivos {
         return new ArrayList<>();
     }
 
-    // 🔴 Adaptado a tu clase Bloqueo actual (usa enteros, Point)
-    public static List<Bloqueo> parsearBloqueos(String contenido) {
-        List<Bloqueo> bloqueos = new ArrayList<>();
-        for (String linea : contenido.split("\\r?\\n")) {
-            try {
-                bloqueos.add(Bloqueo.fromRecord(linea));
-            } catch (Exception e) {
-                System.err.println("⚠️ Error parseando línea BLOQUEO: " + linea);
-            }
-        }
-        return bloqueos;
-    }
-
     // 🟡 Solo placeholder si vas a usar averías luego
     public static List<Averia> parsearAverias(String contenido) {
         return new ArrayList<>();
     }
+    public static List<Bloqueo> parsearBloqueos(String contenido) {
+        // Ejemplo sencillo: cada línea: startMin-endMin:x1,y1,x2,y2,x3,y3,...
+        //   0d0h0m-0d0h10m:5,5,5,6,5,7
+        List<Bloqueo> lista = new ArrayList<>();
+        for (String linea : contenido.split("\\R")) {
+            if (linea.isBlank()) continue;
+            // Usa el parse que ya tienes en tu BloqueoServiceImpl.parseDesdeLinea()
+            // Por simplicidad:
+            Bloqueo b = new BloqueoServiceImpl().parseDesdeLinea(linea);
+            lista.add(b);
+        }
+        return lista;
+    }
+    /**
+     * Agrupa los pedidos por su tiempo de creación (minutos desde t=0).
+     */
+    public static Map<Integer, List<Pedido>> parsearPedidosPorTiempo(String contenido) {
+        return parsearPedidos(contenido).stream()
+                .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+    }
+
+
 }

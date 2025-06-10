@@ -38,4 +38,8 @@ public class TanqueServiceImpl implements TanqueService {
                 .findFirst()
                 .orElse(null);
     }
+    @Override
+    public List<Tanque> listarTodos() {
+        return simulacionEstado.getTanques();
+    }
 }

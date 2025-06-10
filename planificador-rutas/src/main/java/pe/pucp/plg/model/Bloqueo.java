@@ -12,7 +12,7 @@ public class Bloqueo {
     private final int startMin;      // minuto absoluto de inicio
     private final int endMin;        // minuto absoluto de fin (exclusivo)
     private final List<Point> nodes; // nodos extremos del bloqueo (poligonal abierta)
-
+    private String description;
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
 
     public Bloqueo(int startMin, int endMin, List<Point> nodes) {
@@ -99,5 +99,11 @@ public class Bloqueo {
     }
     public List<Point> getNodes() {
         return Collections.unmodifiableList(nodes);
+    }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    public String getDescription() {
+        return description;
     }
 }

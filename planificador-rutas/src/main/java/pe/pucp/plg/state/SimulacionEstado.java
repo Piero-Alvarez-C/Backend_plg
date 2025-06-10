@@ -1,29 +1,39 @@
 package pe.pucp.plg.state;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import pe.pucp.plg.model.*;
+import pe.pucp.plg.service.BloqueoService;
+import pe.pucp.plg.service.CamionService;
+import pe.pucp.plg.service.TanqueService;
 import pe.pucp.plg.util.ParseadorArchivos;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Component
 public class SimulacionEstado {
-    @PostConstruct
-    public void cargarPedidosIniciales() {
-        try {
-            var resource = new ClassPathResource("pedidos.txt");
-            String contenido = Files.readString(resource.getFile().toPath(), StandardCharsets.UTF_8);
-            this.pedidos = ParseadorArchivos.parsearPedidos(contenido);
-            System.out.println("✅ Pedidos cargados correctamente: " + pedidos.size());
-        } catch (Exception e) {
-            System.err.println("❌ No se pudieron cargar los pedidos: " + e.getMessage());
-        }
-    }
 
+    // ————— Inyectar los servicios que proveen datos de camiones, tanques y bloqueos —————
+    @Autowired
+    private CamionService camionService;
+
+    @Autowired @Lazy
+    private TanqueService tanqueService;
+
+    @Autowired @Lazy
+    private BloqueoService bloqueoService;
+
+    private AtomicInteger pedidoSeq = new AtomicInteger(1000);
+    public int generateUniquePedidoId() {
+        return pedidoSeq.getAndIncrement();
+    }
     // 1) Estados de la flota
     private List<Camion> camiones = new ArrayList<>();
 
@@ -63,7 +73,11 @@ public class SimulacionEstado {
     // 13) Turno anterior (para detectar cambio de turno)
     private String turnoAnterior = "";
 
-    // Getters y setters de todos los campos de arriba:
+    /** 14) Últimas rutas calculadas (para exponerlas en el snapshot) */
+    private List<Ruta> rutas = new ArrayList<>();
+
+    // ————— GETTERS y SETTERS (tal como los tienes) —————
+
     public List<Camion> getCamiones() { return camiones; }
     public void setCamiones(List<Camion> camiones) { this.camiones = camiones; }
 
@@ -105,4 +119,60 @@ public class SimulacionEstado {
 
     public String getTurnoAnterior() { return turnoAnterior; }
     public void setTurnoAnterior(String turnoAnterior) { this.turnoAnterior = turnoAnterior; }
+
+    public List<Ruta> getRutas() { return rutas; }
+    public void setRutas(List<Ruta> rutas) { this.rutas = rutas; }
+
+    // ————— Método que ya tenías para pedidos iniciales —————
+    @PostConstruct
+    public void init() {
+        // —— 1️⃣ Pedidos ——
+        try {
+            var pedidoRes = new ClassPathResource("pedidos.txt");
+            String contenidoPedidos = Files.readString(pedidoRes.getFile().toPath(), StandardCharsets.UTF_8);
+
+            // Agrupo pedidos por tiempo de creación
+            pedidosPorTiempo = ParseadorArchivos
+                    .parsearPedidos(contenidoPedidos)
+                    .stream()
+                    .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+
+            // Inicializo pedidos activos (solo los de t=0)
+            pedidos = new ArrayList<>();
+            if (pedidosPorTiempo.containsKey(0)) {
+                pedidos.addAll(pedidosPorTiempo.remove(0));
+            }
+            System.out.println("✅ Pedidos iniciales: " + pedidos.size());
+        } catch (Exception e) {
+            System.err.println("❌ Error cargando pedidos: " + e.getMessage());
+            pedidosPorTiempo = new HashMap<>();
+            pedidos = new ArrayList<>();
+        }
+
+        // —— 2️⃣ Camiones ——
+        camiones = new ArrayList<>(camionService.listarTodos());
+        System.out.println("✅ Camiones cargados: " + camiones.size());
+
+        // —— 3️⃣ Tanques ——
+        tanques = new ArrayList<>();
+        tanques.add(new Tanque(30, 15, 160.0));
+        tanques.add(new Tanque(50, 40, 160.0));
+        tanques.add(new Tanque(20, 10, 160.0));
+        System.out.println("✅ Tanques inicializados: " + tanques.size());
+
+        // —— 4️⃣ Bloqueos ——
+        try {
+            var bloqueoRes = new ClassPathResource("bloqueos.txt");
+            String contenidoBloqs = Files.readString(bloqueoRes.getFile().toPath(), StandardCharsets.UTF_8);
+            bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqs);
+            System.out.println("✅ Bloqueos cargados: " + bloqueos.size());
+        } catch (Exception e) {
+            System.err.println("❌ Error cargando bloqueos: " + e.getMessage());
+            bloqueos = new ArrayList<>();
+        }
+
+        // —— 5️⃣ Tiempo inicial ——
+        currentTime = 0;
+    }
+
 }

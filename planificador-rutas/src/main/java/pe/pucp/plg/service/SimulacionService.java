@@ -50,6 +50,9 @@ public class SimulacionService {
      * Retorna el nuevo tiempo actual.
      */
     public int stepOneMinute() {
+
+
+        // 3️⃣ Delegar en el planificador ACO
         return acoPlanner.stepOneMinute();
     }
 
