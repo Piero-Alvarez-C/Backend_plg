@@ -306,7 +306,10 @@ public class ACOPlanner {
     // ------------------------------------------------------------
     private boolean isBlockedMove(Point prev, Point next, int timeMin) {
         for (Bloqueo b : estado.getBloqueos()) {
-            if (b.coversSegment(prev, next) && b.estaBloqueado(timeMin, next)) {
+            // 1) Solo bloqueos activos en este minuto
+            if (!b.isActiveAt(timeMin)) continue;
+            // 2) Si el punto "next" está en ese segmento bloqueado, lo bloquea
+            if (b.estaBloqueado(timeMin, next)) {
                 return true;
             }
         }
