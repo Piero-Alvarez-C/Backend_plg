@@ -1,11 +1,17 @@
-package pe.pucp.plg.state;
+package pe.pucp.plg.model.context;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import pe.pucp.plg.model.*;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.EntregaEvent;
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.model.common.Ruta;
+import pe.pucp.plg.model.state.CamionDinamico;
+import pe.pucp.plg.model.state.TanqueDinamico;
+import pe.pucp.plg.model.template.TanqueTemplate;
 import pe.pucp.plg.service.BloqueoService;
 import pe.pucp.plg.service.CamionService;
 import pe.pucp.plg.service.TanqueService;
@@ -35,10 +41,10 @@ public class SimulacionEstado {
         return pedidoSeq.getAndIncrement();
     }
     // 1) Estados de la flota
-    private List<Camion> camiones = new ArrayList<>();
+    private List<CamionDinamico> camiones = new ArrayList<>();
 
     // 2) Tanques intermedios
-    private List<Tanque> tanques = new ArrayList<>();
+    private List<TanqueDinamico> tanques = new ArrayList<>();
 
     // 3) Pedidos (históricos + pendientes)
     private List<Pedido> pedidos = new ArrayList<>();
@@ -78,11 +84,11 @@ public class SimulacionEstado {
 
     // ————— GETTERS y SETTERS (tal como los tienes) —————
 
-    public List<Camion> getCamiones() { return camiones; }
-    public void setCamiones(List<Camion> camiones) { this.camiones = camiones; }
+    public List<CamionDinamico> getCamiones() { return camiones; }
+    public void setCamiones(List<CamionDinamico> camiones) { this.camiones = camiones; }
 
-    public List<Tanque> getTanques() { return tanques; }
-    public void setTanques(List<Tanque> tanques) { this.tanques = tanques; }
+    public List<TanqueDinamico> getTanques() { return tanques; }
+    public void setTanques(List<TanqueDinamico> tanques) { this.tanques = tanques; }
 
     public List<Pedido> getPedidos() { return pedidos; }
     public void setPedidos(List<Pedido> pedidos) { this.pedidos = pedidos; }
@@ -123,6 +129,14 @@ public class SimulacionEstado {
     public List<Ruta> getRutas() { return rutas; }
     public void setRutas(List<Ruta> rutas) { this.rutas = rutas; }
 
+    public TanqueDinamico obtenerTanquePorPosicion(int x, int y) {
+        return tanques.stream()
+                .filter(t -> t.getPosX() == x && t.getPosY() == y)
+                .findFirst()
+                .orElse(null);
+    }
+
+
     // ————— Método que ya tenías para pedidos iniciales —————
     @PostConstruct
     public void init() {
@@ -150,14 +164,11 @@ public class SimulacionEstado {
         }
 
         // —— 2️⃣ Camiones ——
-        camiones = new ArrayList<>(camionService.listarTodos());
+        camiones = camionService.inicializarFlota();
         System.out.println("✅ Camiones cargados: " + camiones.size());
 
         // —— 3️⃣ Tanques ——
-        tanques = new ArrayList<>();
-        tanques.add(new Tanque(30, 15, 160.0));
-        tanques.add(new Tanque(50, 40, 160.0));
-        tanques.add(new Tanque(20, 10, 160.0));
+        tanques = tanqueService.inicializarTanques();
         System.out.println("✅ Tanques inicializados: " + tanques.size());
 
         // —— 4️⃣ Bloqueos ——

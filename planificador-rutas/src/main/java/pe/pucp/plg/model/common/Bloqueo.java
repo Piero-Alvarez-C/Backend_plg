@@ -1,7 +1,6 @@
-package pe.pucp.plg.model;
+package pe.pucp.plg.model.common;
 
 import java.awt.*;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

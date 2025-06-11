@@ -1,10 +1,14 @@
-package pe.pucp.plg.service;
+package pe.pucp.plg.service.Impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pe.pucp.plg.model.*;
+import pe.pucp.plg.model.common.Averia;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.Mantenimiento;
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.service.CamionService;
+import pe.pucp.plg.service.PlanificadorService;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 

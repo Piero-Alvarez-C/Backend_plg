@@ -1,9 +1,10 @@
-package pe.pucp.plg.service;
+package pe.pucp.plg.service.Impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pe.pucp.plg.model.Bloqueo;
-import pe.pucp.plg.state.SimulacionEstado;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.context.SimulacionEstado;
+import pe.pucp.plg.service.BloqueoService;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import java.util.regex.Pattern;
 import java.util.List;
 
 @Service
-public class BloqueoServiceImpl implements BloqueoService{
+public class BloqueoServiceImpl implements BloqueoService {
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
     @Autowired
     private SimulacionEstado simulacionEstado;

@@ -1,25 +1,27 @@
-package pe.pucp.plg.model;
+package pe.pucp.plg.model.state;
+
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.model.template.CamionTemplate;
 
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class Camion {
+public class CamionDinamico {
     public enum TruckStatus {
         AVAILABLE, DELIVERING, RETURNING
     }
 
+    // === Referencia a la plantilla ===
+    private final CamionTemplate plantilla;
+
     // --- Identificación y capacidades ---
-    private final String id;
-    private final double capacidadCarga;
     private double disponible;
-    private final double tara;
     private static final double pesoTara = 2.5;
     private static final double pesoCargoPorM3 = 0.5;
 
     // --- Combustible ---
-    private final double capacidadCombustible;
     private double combustibleDisponible;
 
     // --- Posición y timing ---
@@ -39,15 +41,16 @@ public class Camion {
     private double combustibleGastado = 0.0;
 
     // --- Para recarga en tanque ---
-    private Tanque reabastecerEnTanque = null;
+    private TanqueDinamico reabastecerEnTanque = null;
     private int retHora = 0, retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
 
     // --- Constructor ---
-    public Camion(String id, double capacidadCarga, double tara, double capacidadCombustible) {
-        this.id = id;
-        this.capacidadCarga = capacidadCarga;
-        this.tara = tara;
-        this.capacidadCombustible = capacidadCombustible;
+    public CamionDinamico(String id, double capacidadCarga, double tara, double capacidadCombustible) {
+        this.plantilla = new CamionTemplate();
+        this.plantilla.setId(id);
+        this.plantilla.setCapacidadCarga(capacidadCarga);
+        this.plantilla.setTara(tara);
+        this.plantilla.setCapacidadCombustible(capacidadCombustible);
         this.combustibleDisponible = capacidadCombustible;
     }
 
@@ -57,11 +60,11 @@ public class Camion {
     }
 
     // --- Getters y Setters ---
-    public String getId() { return id; }
-    public double getCapacidad() { return capacidadCarga; }
+    public String getId() { return plantilla.getId(); }
+    public double getCapacidad() { return plantilla.getCapacidadCarga(); }
     public double getDisponible() { return disponible; }
     public void setDisponible(double d) { this.disponible = d; }
-    public double getTara() { return tara; }
+    public double getTara() { return plantilla.getTara(); }
     public int getX() { return x; }
     public int getY() { return y; }
     public void setX(int x_aux) { this.x = x_aux; }
@@ -87,15 +90,15 @@ public class Camion {
     public double getCombustibleGastado() { return combustibleGastado; }
     public void setCombustibleGastado(double c) { this.combustibleGastado = c; }
 
-    public double getCapacidadCombustible() { return capacidadCombustible; }
+    public double getCapacidadCombustible() { return plantilla.getCapacidadCombustible(); }
     public double getCombustibleDisponible() { return combustibleDisponible; }
     public void setCombustibleDisponible(double c) { this.combustibleDisponible = c; }
 
     public static double getPesoTara() { return pesoTara; }
     public static double getPesoCargoPorM3() { return pesoCargoPorM3; }
 
-    public Tanque getReabastecerEnTanque() { return reabastecerEnTanque; }
-    public void setReabastecerEnTanque(Tanque t) { this.reabastecerEnTanque = t; }
+    public TanqueDinamico getReabastecerEnTanque() { return reabastecerEnTanque; }
+    public void setReabastecerEnTanque(TanqueDinamico t) { this.reabastecerEnTanque = t; }
 
     public int getRetHora() { return retHora; }
     public void setRetHora(int retHora) { this.retHora = retHora; }

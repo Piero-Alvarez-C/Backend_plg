@@ -1,6 +1,9 @@
 package pe.pucp.plg.service;
 
-import pe.pucp.plg.model.*;
+import pe.pucp.plg.model.common.Averia;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.Mantenimiento;
+import pe.pucp.plg.model.common.Pedido;
 
 import java.util.List;
 

@@ -1,18 +1,26 @@
-package pe.pucp.plg.service;
+package pe.pucp.plg.service.Impl;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import pe.pucp.plg.dto.ArchivoTipo;
-import pe.pucp.plg.model.*;
+import pe.pucp.plg.dto.enums.ArchivoTipo;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.Mantenimiento;
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.service.ArchivoService;
+import pe.pucp.plg.service.PlanificadorService;
 import pe.pucp.plg.util.ParseadorArchivos;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ArchivoServiceImpl implements ArchivoService {
 
+    // Almacenamiento en memoria de archivos subidos
+    private final Map<String, byte[]> archivosTemporales = new ConcurrentHashMap<>();
     private final PlanificadorService planificadorService;
 
     public ArchivoServiceImpl(PlanificadorService planificadorService) {
@@ -37,10 +45,6 @@ public class ArchivoServiceImpl implements ArchivoService {
                     List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenido);
                     planificadorService.setBloqueos(bloqueos);
                 }
-                case AVERIAS -> {
-                    List<Averia> averias = ParseadorArchivos.parsearAverias(contenido);
-                    planificadorService.setAverias(averias);
-                }
                 default -> throw new IllegalArgumentException("Tipo de archivo no soportado");
             }
 
@@ -49,5 +53,25 @@ public class ArchivoServiceImpl implements ArchivoService {
         } catch (IOException e) {
             throw new RuntimeException("Error leyendo archivo: " + e.getMessage());
         }
+    }
+
+    @Override
+    public String guardarArchivoTemporal(MultipartFile archivo) throws Exception {
+        if (archivo == null || archivo.isEmpty()) {
+            throw new IllegalArgumentException("Archivo vacío o nulo.");
+        }
+
+        String fileId = UUID.randomUUID().toString();
+        archivosTemporales.put(fileId, archivo.getBytes());
+        return fileId;
+    }
+
+    @Override
+    public byte[] obtenerArchivo(String fileId) throws Exception {
+        byte[] contenido = archivosTemporales.get(fileId);
+        if (contenido == null) {
+            throw new IllegalArgumentException("Archivo no encontrado con ID: " + fileId);
+        }
+        return contenido;
     }
 }

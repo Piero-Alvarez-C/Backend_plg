@@ -4,15 +4,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.pucp.plg.dto.*;
-import pe.pucp.plg.model.Camion;
-import pe.pucp.plg.model.Tanque;
-import pe.pucp.plg.service.CamionService;
 import pe.pucp.plg.service.SimulacionService;
-import pe.pucp.plg.service.TanqueService;
-import pe.pucp.plg.state.SimulacionEstado;
+import pe.pucp.plg.model.context.SimulacionEstado;
 import pe.pucp.plg.util.MapperUtil;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "http://localhost:3000")
@@ -86,4 +81,10 @@ public class SimulacionController {
         return ResponseEntity.ok(estado.getCurrentTime());
     }
 
+
+    @PostMapping("/start")
+    public ResponseEntity<SimulationStatusDTO> iniciarSimulacion(@RequestBody SimulationRequest request) {
+        SimulationStatusDTO estado = simulacionService.iniciarSimulacion(request);
+        return ResponseEntity.ok(estado);
+    }
 }

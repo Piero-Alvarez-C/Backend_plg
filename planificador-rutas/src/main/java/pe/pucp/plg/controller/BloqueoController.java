@@ -4,8 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.pucp.plg.dto.BloqueoDTO;
-import pe.pucp.plg.model.Bloqueo;
-import pe.pucp.plg.state.SimulacionEstado;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.context.SimulacionEstado;
 import pe.pucp.plg.util.MapperUtil;
 
 import java.util.List;

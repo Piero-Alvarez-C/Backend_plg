@@ -1,4 +1,4 @@
-package pe.pucp.plg.model;
+package pe.pucp.plg.model.common;
 
 public class Averia {
     private String turno;           // T1, T2, T3

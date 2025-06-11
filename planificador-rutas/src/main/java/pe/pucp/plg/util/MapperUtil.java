@@ -1,8 +1,13 @@
 package pe.pucp.plg.util;
 
 import pe.pucp.plg.dto.*;
-import pe.pucp.plg.model.*;
-import pe.pucp.plg.state.SimulacionEstado;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.model.common.Ruta;
+import pe.pucp.plg.model.context.SimulacionEstado;
+import pe.pucp.plg.model.state.CamionDinamico;
+import pe.pucp.plg.model.state.CamionEstado;
+import pe.pucp.plg.model.state.TanqueDinamico;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -11,7 +16,7 @@ import java.util.stream.Collectors;
 
 public class MapperUtil {
 
-    public static CamionDTO toCamionDTO(Camion camion) {
+    public static CamionDTO toCamionDTO(CamionDinamico camion) {
         CamionDTO dto = new CamionDTO();
         dto.setId(camion.getId());
         dto.setX(camion.getX());
@@ -23,7 +28,7 @@ public class MapperUtil {
         return dto;
     }
 
-    public static TanqueDTO toTanqueDTO(Tanque tanque) {
+    public static TanqueDTO toTanqueDTO(TanqueDinamico tanque) {
         TanqueDTO dto = new TanqueDTO();
         dto.setX(tanque.getPosX());
         dto.setY(tanque.getPosY());

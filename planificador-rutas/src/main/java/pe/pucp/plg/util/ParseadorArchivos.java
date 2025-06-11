@@ -1,11 +1,10 @@
 package pe.pucp.plg.util;
 
-import pe.pucp.plg.model.*;
-import pe.pucp.plg.service.BloqueoServiceImpl;
+import pe.pucp.plg.model.common.Bloqueo;
+import pe.pucp.plg.model.common.Mantenimiento;
+import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.service.Impl.BloqueoServiceImpl;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,10 +45,6 @@ public class ParseadorArchivos {
         return new ArrayList<>();
     }
 
-    // 🟡 Solo placeholder si vas a usar averías luego
-    public static List<Averia> parsearAverias(String contenido) {
-        return new ArrayList<>();
-    }
     public static List<Bloqueo> parsearBloqueos(String contenido) {
         // Ejemplo sencillo: cada línea: startMin-endMin:x1,y1,x2,y2,x3,y3,...
         //   0d0h0m-0d0h10m:5,5,5,6,5,7
@@ -69,6 +64,35 @@ public class ParseadorArchivos {
     public static Map<Integer, List<Pedido>> parsearPedidosPorTiempo(String contenido) {
         return parsearPedidos(contenido).stream()
                 .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+    }
+
+    public static Map<String, Map<String, String>> parsearAverias(String contenido) {
+        Map<String, Map<String, String>> resultado = new HashMap<>();
+
+        for (String linea : contenido.split("\\R")) {
+            if (linea.isBlank()) continue;
+
+            try {
+                String[] partes = linea.split("_");
+                if (partes.length != 3) {
+                    System.err.println("⚠️ Formato incorrecto en línea de avería: " + linea);
+                    continue;
+                }
+
+                String turno = partes[0].trim();         // T1, T2, T3
+                String camionId = partes[1].trim();      // CAM001, etc.
+                String tipoIncidente = partes[2].trim(); // TI1, TI2, etc.
+
+                resultado
+                        .computeIfAbsent(turno, k -> new HashMap<>())
+                        .put(camionId, tipoIncidente);
+
+            } catch (Exception e) {
+                System.err.println("❌ Error parseando avería: " + linea + " → " + e.getMessage());
+            }
+        }
+
+        return resultado;
     }
 
 

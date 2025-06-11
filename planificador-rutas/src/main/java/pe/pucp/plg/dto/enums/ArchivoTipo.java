@@ -1,4 +1,4 @@
-package pe.pucp.plg.dto;
+package pe.pucp.plg.dto.enums;
 
 public enum ArchivoTipo {
     PEDIDOS,

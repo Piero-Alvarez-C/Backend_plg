@@ -1,8 +1,7 @@
 package pe.pucp.plg.service;
 
-import pe.pucp.plg.model.Bloqueo;
+import pe.pucp.plg.model.common.Bloqueo;
 
-import java.util.*;
 import java.awt.*;
 import java.util.List;
 

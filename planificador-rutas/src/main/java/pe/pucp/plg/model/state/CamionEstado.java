@@ -1,4 +1,4 @@
-package pe.pucp.plg.model;
+package pe.pucp.plg.model.state;
 
 public class CamionEstado {
     public String id;

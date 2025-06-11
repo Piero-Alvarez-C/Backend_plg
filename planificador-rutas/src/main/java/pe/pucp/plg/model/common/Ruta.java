@@ -1,4 +1,6 @@
-package pe.pucp.plg.model;
+package pe.pucp.plg.model.common;
+
+import pe.pucp.plg.model.state.CamionEstado;
 
 import java.util.ArrayList;
 import java.util.List;

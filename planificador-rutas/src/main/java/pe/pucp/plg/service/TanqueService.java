@@ -1,12 +1,11 @@
 package pe.pucp.plg.service;
 
-import pe.pucp.plg.model.Tanque;
+import pe.pucp.plg.model.state.TanqueDinamico;
 import java.util.List;
 
 public interface TanqueService {
-    void reset(Tanque tanque);
-    boolean puedeAbastecer(Tanque tanque, double volumen);
-    void reducirCapacidad(Tanque tanque, double volumen);
-    Tanque obtenerPorPosicion(int x, int y);
-    List<Tanque> listarTodos();
+    void reset(TanqueDinamico tanque);
+    boolean puedeAbastecer(TanqueDinamico tanque, double volumen);
+    void reducirCapacidad(TanqueDinamico tanque, double volumen);
+    List<TanqueDinamico> inicializarTanques();
 }

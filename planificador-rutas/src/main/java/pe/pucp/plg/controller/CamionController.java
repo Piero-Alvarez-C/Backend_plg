@@ -4,9 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.pucp.plg.dto.CamionDTO;
-import pe.pucp.plg.model.Camion;
+import pe.pucp.plg.model.state.CamionDinamico;
 import pe.pucp.plg.service.CamionService;
-import pe.pucp.plg.state.SimulacionEstado;
+import pe.pucp.plg.model.context.SimulacionEstado;
 import pe.pucp.plg.util.MapperUtil;
 
 import java.util.List;
@@ -31,9 +31,17 @@ public class CamionController {
         return ResponseEntity.ok(lista);
     }
 
+    @GetMapping("/states")
+    public ResponseEntity<List<CamionDTO>> states() {
+        List<CamionDTO> lista = simulacionEstado.getCamiones().stream()
+                .map(MapperUtil::toCamionDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(lista);
+    }
+
     @PostMapping("/{id}/reset")
     public ResponseEntity<?> reset(@PathVariable String id) {
-        Camion camion = buscarPorId(id);
+        CamionDinamico camion = buscarPorId(id);
         if (camion == null) return ResponseEntity.notFound().build();
         camionService.reset(camion);
         return ResponseEntity.ok().build();
@@ -41,7 +49,7 @@ public class CamionController {
 
     @PostMapping("/{id}/paso")
     public ResponseEntity<?> avanzarPaso(@PathVariable String id) {
-        Camion camion = buscarPorId(id);
+        CamionDinamico camion = buscarPorId(id);
         if (camion == null) return ResponseEntity.notFound().build();
         camionService.avanzarUnPaso(camion);
         return ResponseEntity.ok().build();
@@ -49,13 +57,13 @@ public class CamionController {
 
     @PostMapping("/{id}/recargar")
     public ResponseEntity<?> recargar(@PathVariable String id) {
-        Camion camion = buscarPorId(id);
+        CamionDinamico camion = buscarPorId(id);
         if (camion == null) return ResponseEntity.notFound().build();
         camionService.recargarCombustible(camion);
         return ResponseEntity.ok().build();
     }
 
-    private Camion buscarPorId(String id) {
+    private CamionDinamico buscarPorId(String id) {
         return simulacionEstado.getCamiones().stream()
                 .filter(c -> c.getId().equals(id))
                 .findFirst()

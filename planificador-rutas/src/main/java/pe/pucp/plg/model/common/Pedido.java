@@ -1,6 +1,4 @@
-package pe.pucp.plg.model;
-
-import java.time.LocalDateTime;
+package pe.pucp.plg.model.common;
 
 public class Pedido {
     int id, x, y, tiempoCreacion, tiempoLimite;
@@ -16,6 +14,7 @@ public class Pedido {
     }
     // → getters para la tabla de pedidos:
     public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
     public int getX() { return x; }
     public int getY() { return y; }
     public double getVolumen() { return volumen; }
