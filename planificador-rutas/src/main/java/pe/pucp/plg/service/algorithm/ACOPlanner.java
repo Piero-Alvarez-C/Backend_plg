@@ -333,7 +333,7 @@ public class ACOPlanner {
     }
 
     public List<Point> findPathAStar(int x1, int y1, int x2, int y2, int tiempo) {
-        boolean[][] closed = new boolean[70][50];
+        boolean[][] closed = new boolean[71][51];
         PriorityQueue<Node> open = new PriorityQueue<>();
         open.add(new Node(new Point(x1,y1), 0, manhattan(x1,y1,x2,y2), null));
 
@@ -352,7 +352,7 @@ public class ACOPlanner {
 
             for (int[] d : new int[][] {{1,0},{-1,0},{0,1},{0,-1}}) {
                 int nx = cx + d[0], ny = cy + d[1];
-                if (nx < 0 || nx >= 70 || ny < 0 || ny >= 50) continue;
+                if (nx < 0 || nx >= 71 || ny < 0 || ny >= 51) continue;
                 Point next = new Point(nx, ny);
 
                 boolean bad = false;
@@ -788,8 +788,8 @@ public class ACOPlanner {
                                 tiempoActual, camion.getId(), p.getId());
                         continue;
                     }
-                    System.out.printf("⏱️ t+%d: Asignando Pedido #%d al Camión %s%n",
-                            tiempoActual, p.getId(), camion.getId());
+                    System.out.printf("⏱️ t+%d: Asignando Pedido #%d al Camión %s%n (%d,%d)",
+                            tiempoActual, p.getId(), camion.getId(),p.getX(), p.getY());
 
                     List<Point> path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual);
                     int dist = Math.abs(cx - p.getX()) + Math.abs(cy - p.getY());
