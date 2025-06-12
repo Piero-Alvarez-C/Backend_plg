@@ -1,12 +1,12 @@
 package pe.pucp.plg.service.Impl;
 
-import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Mantenimiento;
 import pe.pucp.plg.model.common.Pedido;
-import pe.pucp.plg.service.CamionService;
+//import pe.pucp.plg.service.CamionService;
 import pe.pucp.plg.service.PlanificadorService;
 
 import java.util.ArrayList;
@@ -19,8 +19,8 @@ public class PlanificadorServiceImpl implements PlanificadorService {
     private List<Mantenimiento> mantenimientos = new ArrayList<>();
     private List<Bloqueo> bloqueos = new ArrayList<>();
     private List<Averia> averias = new ArrayList<>();
-    @Autowired
-    private CamionService camionService;
+    //@Autowired
+    //private CamionService camionService;
 
     @Override
     public void setPedidos(List<Pedido> pedidos) {

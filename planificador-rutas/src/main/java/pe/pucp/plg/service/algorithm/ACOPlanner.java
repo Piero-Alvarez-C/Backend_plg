@@ -56,7 +56,7 @@ public class ACOPlanner {
                 while (!noAsignados.isEmpty()) {
                     double[][] prob = calcularProbabilidades(rutas, pedidosActivos, noAsignados, tau, tiempoActual);
                     Seleccion sel = muestrearPar(prob, noAsignados);
-                    boolean ok = asignarPedidoARuta(sel.camionIdx, sel.pedidoIdx, rutas, pedidosActivos, tiempoActual);
+                    asignarPedidoARuta(sel.camionIdx, sel.pedidoIdx, rutas, pedidosActivos, tiempoActual);
                     noAsignados.remove(Integer.valueOf(sel.pedidoIdx));
                 }
                 soluciones.add(rutas);
@@ -473,7 +473,7 @@ public class ACOPlanner {
                 camionService.avanzarUnPaso(c);
             } else if (c.getStatus() == CamionDinamico.TruckStatus.RETURNING) {
                 // lógica de recarga automática al llegar a depósito (queda igual)
-                double falta = c.getCapacidad() - c.getDisponible();
+                //double falta = c.getCapacidad() - c.getDisponible();
                 TanqueDinamico tq = c.getReabastecerEnTanque();
                 if (tq != null) {
                     System.out.printf("🔄 t+%d: Camión %s llegó a tanque (%d,%d) y recargado a %.1f m³%n",

@@ -1,9 +1,5 @@
 package pe.pucp.plg.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-
-import java.time.LocalDateTime;
-
 public class PedidoDTO {
 
     private int id;

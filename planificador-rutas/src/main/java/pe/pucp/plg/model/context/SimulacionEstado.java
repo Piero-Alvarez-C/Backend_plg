@@ -11,7 +11,6 @@ import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
 import pe.pucp.plg.model.state.CamionDinamico;
 import pe.pucp.plg.model.state.TanqueDinamico;
-import pe.pucp.plg.model.template.TanqueTemplate;
 import pe.pucp.plg.service.BloqueoService;
 import pe.pucp.plg.service.CamionService;
 import pe.pucp.plg.service.TanqueService;

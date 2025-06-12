@@ -30,8 +30,8 @@ public class MapperUtil {
 
     public static TanqueDTO toTanqueDTO(TanqueDinamico tanque) {
         TanqueDTO dto = new TanqueDTO();
-        dto.setX(tanque.getPosX());
-        dto.setY(tanque.getPosY());
+        dto.setPosX(tanque.getPosX());
+        dto.setPosY(tanque.getPosY());
         dto.setCapacidadTotal(tanque.getCapacidadTotal());
         dto.setCapacidadDisponible(tanque.getDisponible());
         return dto;

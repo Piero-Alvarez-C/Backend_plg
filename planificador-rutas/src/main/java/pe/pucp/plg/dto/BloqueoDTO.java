@@ -2,7 +2,6 @@ package pe.pucp.plg.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.awt.Point;
 import java.util.List;
 
 public class BloqueoDTO {

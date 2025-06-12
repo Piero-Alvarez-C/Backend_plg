@@ -57,7 +57,7 @@ public class CamionServiceImpl implements CamionService {
     @Override
     public void avanzarUnPaso(CamionDinamico camion) {
         if (!camion.tienePasosPendientes()) return;
-        double pesoTotal = camion.getPesoTara() + (camion.getDisponible() * camion.getPesoCargoPorM3());
+        double pesoTotal = CamionDinamico.getPesoTara() + (camion.getDisponible() * CamionDinamico.getPesoCargoPorM3());
         double gasto = pesoTotal / 180.0;
         camion.setConsumoAcumulado(camion.getConsumoAcumulado() + gasto);
         camion.setCombustibleDisponible(camion.getCombustibleDisponible() - gasto);

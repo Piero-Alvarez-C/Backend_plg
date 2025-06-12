@@ -34,8 +34,8 @@ public class SimulacionService {
     @Autowired
     private TanqueService tanqueService;
 
-    @Autowired
-    private BloqueoService bloqueoService;
+    //@Autowired
+    //private BloqueoService bloqueoService;
 
     /**
      * Reinicia simulación (delegar a SimulacionEstado).
