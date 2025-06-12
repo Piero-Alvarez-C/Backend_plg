@@ -471,6 +471,7 @@ public class ACOPlanner {
             if (c.tienePasosPendientes()) {
                 // Llamada a CamionService para que el camión avance UN paso en su rutaActual
                 camionService.avanzarUnPaso(c);
+                System.out.printf("→ Camión %s avanza a (%d,%d)%n", c.getId(), c.getX(), c.getY());
             } else if (c.getStatus() == CamionDinamico.TruckStatus.RETURNING) {
                 // lógica de recarga automática al llegar a depósito (queda igual)
                 //double falta = c.getCapacidad() - c.getDisponible();
@@ -669,57 +670,94 @@ public class ACOPlanner {
     private boolean esDesvioValido(CamionDinamico c, Pedido p, int tiempoActual) {
         double disponible = c.getDisponible();
         int hora = tiempoActual;
-        int currX = c.getX(), currY = c.getY();
-        int d = Math.abs(currX - p.getX()) + Math.abs(currY - p.getY());
-        int tViaje = (int) Math.ceil(d * (60.0 / 50.0));
-        hora += tViaje;
+        int prevX = c.getX(), prevY = c.getY();
+
+        // — Primer tramo: al NUEVO pedido —
+        List<Point> pathToNew = buildManhattanPath(prevX, prevY, p.getX(), p.getY(), hora);
+        if (pathToNew == null) return false;           // imposible alcanzar
+        hora += pathToNew.size();                      // 1 paso = 1 minuto
+        hora += 15;                                    // +15 min de descarga
         if (hora > p.getTiempoLimite()) return false;
         disponible -= p.getVolumen();
         if (disponible < 0) return false;
 
-        int simX = p.getX(), simY = p.getY();
+        // avanzamos “virtualmente” a la posición del pedido
+        prevX = p.getX();
+        prevY = p.getY();
+
+        // — Siguientes tramos: los pedidos ya en rutaPendiente —
         for (Pedido orig : c.getRutaPendiente()) {
-            d = Math.abs(simX - orig.getX()) + Math.abs(simY - orig.getY());
-            tViaje = (int) Math.ceil(d * (60.0 / 50.0));
-            hora += tViaje;
-            if (hora > orig.getTiempoLimite() || (disponible -= orig.getVolumen()) < 0) {
-                return false;
-            }
-            simX = orig.getX(); simY = orig.getY();
+            List<Point> pathSeg = buildManhattanPath(prevX, prevY, orig.getX(), orig.getY(), hora);
+            if (pathSeg == null) return false;         // no hay ruta libre
+            hora += pathSeg.size();
+            hora += 15;                                // tiempo de servicio
+            if (hora > orig.getTiempoLimite()) return false;
+            disponible -= orig.getVolumen();
+            if (disponible < 0) return false;
+
+            prevX = orig.getX();
+            prevY = orig.getY();
         }
+
         return true;
     }
 
-    private int posicionOptimaDeInsercion(CamionDinamico c, Pedido p, int tiempoActual) {
+
+    private int posicionOptimaDeInsercion(CamionDinamico c, Pedido pNuevo, int tiempoActual) {
         List<Pedido> originales = c.getRutaPendiente();
         int mejorIdx = originales.size();
-        int mejorLlegada = Integer.MAX_VALUE;
+        int mejorHoraEntrega = Integer.MAX_VALUE;
 
+        // Capacidad y posición de arranque reales del camión
+        double capacidadOriginal = c.getDisponible();
+        int x0 = c.getX(), y0 = c.getY();
+
+        // Probar cada posible posición de inserción
         for (int idx = 0; idx <= originales.size(); idx++) {
-            double disponible = c.getDisponible();
+            double disponible = capacidadOriginal;
             int hora = tiempoActual;
-            int simX = c.getX(), simY = c.getY();
+            int simX = x0, simY = y0;
 
+            // Montamos la lista de pedidos en el orden de prueba
             List<Pedido> prueba = new ArrayList<>(originales);
-            prueba.add(idx, p);
+            prueba.add(idx, pNuevo);
 
             boolean valido = true;
+            // Recorremos cada segmento (pedido) con ruta real
             for (Pedido q : prueba) {
-                int d = Math.abs(simX - q.getX()) + Math.abs(simY - q.getY());
-                int tViaje = (int) Math.ceil(d * (60.0 / 50.0));
-                hora += tViaje;
-                if (hora > q.getTiempoLimite() || (disponible -= q.getVolumen()) < 0) {
+                // 1) Construir la ruta real (bloqueos-aware) desde (simX,simY) hasta q
+                List<Point> path = buildManhattanPath(simX, simY, q.getX(), q.getY(), hora);
+                if (path == null) {
                     valido = false;
                     break;
                 }
-                simX = q.getX(); simY = q.getY();
+                // 2) Tiempo de viaje = número de pasos
+                hora += path.size();
+                // 3) Tiempo de servicio (descarga)
+                hora += 15;
+                // 4) Comprobar deadline
+                if (hora > q.getTiempoLimite()) {
+                    valido = false;
+                    break;
+                }
+                // 5) Restar volumen al disponible
+                disponible -= q.getVolumen();
+                if (disponible < 0) {
+                    valido = false;
+                    break;
+                }
+                // 6) Avanzar “virtual” a la posición del pedido
+                simX = q.getX();
+                simY = q.getY();
             }
 
-            if (valido && hora < mejorLlegada) {
-                mejorLlegada = hora;
+            // Si democrático y acaba antes (mejor horaEntrega), guardamos índice
+            if (valido && hora < mejorHoraEntrega) {
+                mejorHoraEntrega = hora;
                 mejorIdx = idx;
             }
         }
+
         return mejorIdx;
     }
 
@@ -752,6 +790,19 @@ public class ACOPlanner {
             CamionDinamico camion = findCamion(ruta.estadoCamion.id);
             Pedido nuevo = activos.get(ruta.pedidos.get(0));
 
+            // ─── INSTRUMENTACIÓN DE LOGS ────────────────────────────
+            boolean condStatus    = camion.getStatus() == CamionDinamico.TruckStatus.DELIVERING;
+            boolean condValido    = esDesvioValido(camion, nuevo, tiempoActual);
+            boolean condCapacidad = camion.getDisponible() >= nuevo.getVolumen();
+            System.out.printf(
+                    "🔍 Desvío? Camión=%s Pedido=%d | status=DELIVERING?%b | esDesvíoValido?%b | capSuficiente?%b%n",
+                    camion.getId(),
+                    nuevo.getId(),
+                    condStatus,
+                    condValido,
+                    condCapacidad
+            );
+
             if (camion.getStatus() == CamionDinamico.TruckStatus.DELIVERING
                     && esDesvioValido(camion, nuevo, tiempoActual)
                     && camion.getDisponible() >= nuevo.getVolumen()) {
@@ -764,8 +815,9 @@ public class ACOPlanner {
 
                 int cx = camion.getX(), cy = camion.getY();
                 List<Point> path = buildManhattanPath(cx, cy, nuevo.getX(), nuevo.getY(), tiempoActual);
-                int dist = Math.abs(cx - nuevo.getX()) + Math.abs(cy - nuevo.getY());
-                int tViaje = (int) Math.ceil(dist * (60.0 / 50.0));
+                int pasos = path.size();
+                //int dist = Math.abs(cx - nuevo.getX()) + Math.abs(cy - nuevo.getY());
+                int tViaje = (int) Math.ceil(pasos * (60.0 / 50.0));
 
                 camion.setRutaActual(path);
                 camion.getHistory().addAll(path);
@@ -792,7 +844,7 @@ public class ACOPlanner {
                             tiempoActual, p.getId(), camion.getId(),p.getX(), p.getY());
 
                     List<Point> path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual);
-                    int dist = Math.abs(cx - p.getX()) + Math.abs(cy - p.getY());
+                    int dist = path.size();
                     int tViaje = (int) Math.ceil(dist * (60.0 / 50.0));
 
                     camion.setRutaActual(path);
