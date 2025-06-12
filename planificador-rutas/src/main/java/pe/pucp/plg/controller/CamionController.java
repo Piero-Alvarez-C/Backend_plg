@@ -25,19 +25,12 @@ public class CamionController {
 
     @GetMapping
     public ResponseEntity<List<CamionDTO>> listarCamiones() {
-        List<CamionDTO> lista = simulacionEstado.getCamiones().stream()
+        List<CamionDTO> lista = camionService.inicializarFlota().stream()
                 .map(MapperUtil::toCamionDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }
 
-    @GetMapping("/states")
-    public ResponseEntity<List<CamionDTO>> states() {
-        List<CamionDTO> lista = simulacionEstado.getCamiones().stream()
-                .map(MapperUtil::toCamionDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(lista);
-    }
 
     @PostMapping("/{id}/reset")
     public ResponseEntity<?> reset(@PathVariable String id) {
