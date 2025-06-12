@@ -10,7 +10,6 @@ import pe.pucp.plg.util.MapperUtil;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/tanques")
 public class TanqueController {
