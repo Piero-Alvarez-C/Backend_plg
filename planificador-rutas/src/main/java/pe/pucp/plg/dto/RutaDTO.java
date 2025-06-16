@@ -3,18 +3,14 @@ package pe.pucp.plg.dto;
 import java.util.List;
 
 public class RutaDTO {
-    /** Estado del camión usado en esta ruta */
-    private CamionEstadoDTO estadoCamion;
-    /** IDs de los pedidos que atiende en esta ruta */
+    private String camionId;
     private List<Integer> pedidos;
-    /** Distancia total de la ruta (mismo campo en el modelo) */
     private double distancia;
-    /** Consumo total estimado en la ruta */
     private double consumo;
 
     // Getters / Setters
-    public CamionEstadoDTO getEstadoCamion() { return estadoCamion; }
-    public void setEstadoCamion(CamionEstadoDTO estadoCamion) { this.estadoCamion = estadoCamion; }
+    public String getCamionId() { return camionId; }
+    public void setCamionId(String camionId) { this.camionId = camionId; }
 
     public List<Integer> getPedidos() { return pedidos; }
     public void setPedidos(List<Integer> pedidos) { this.pedidos = pedidos; }

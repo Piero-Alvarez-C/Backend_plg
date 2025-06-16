@@ -5,56 +5,74 @@ package pe.pucp.plg.model.template;
  */
 public class CamionTemplate {
 
-    private String id;
-    private double capacidadCarga;
-    private double tara;
-    private double capacidadCombustible;
+    private final String id;
+    private final double capacidadCarga;
+    private final double tara;
+    private final double capacidadCombustible;
+    private final int initialX;
+    private final int initialY;
+    private final double consumoCombustiblePorKm; // Added: e.g., liters per kilometer
+    private final double velocidadPromedioKmPorMin; // Added: e.g., km per minute
 
     private static final double pesoTara = 2.5;
     private static final double pesoCargoPorM3 = 0.5;
 
-    public CamionTemplate(String id, double capacidadCarga, double tara, double capacidadCombustible) {
+    // Constructor with initial position, consumption, and speed
+    public CamionTemplate(String id, double capacidadCarga, double tara, double capacidadCombustible, 
+                          int initialX, int initialY, 
+                          double consumoCombustiblePorKm, double velocidadPromedioKmPorMin) {
         this.id = id;
         this.capacidadCarga = capacidadCarga;
         this.tara = tara;
         this.capacidadCombustible = capacidadCombustible;
+        this.initialX = initialX;
+        this.initialY = initialY;
+        this.consumoCombustiblePorKm = consumoCombustiblePorKm;
+        this.velocidadPromedioKmPorMin = velocidadPromedioKmPorMin;
     }
 
-    public CamionTemplate() {
-
+    // Overloaded constructor with default initial position (0,0) and example consumption/speed
+    public CamionTemplate(String id, double capacidadCarga, double tara, double capacidadCombustible) {
+        this(id, capacidadCarga, tara, capacidadCombustible, 0, 0, 0.2, 0.833); // Default 0.2 L/km, 50 km/h (0.833 km/min)
     }
+    
+    // Overloaded constructor with specified initial position and example consumption/speed
+    public CamionTemplate(String id, double capacidadCarga, double tara, double capacidadCombustible, int initialX, int initialY) {
+        this(id, capacidadCarga, tara, capacidadCombustible, initialX, initialY, 0.2, 0.833); // Default 0.2 L/km, 50 km/h (0.833 km/min)
+    }
+
 
     // --- Getters y Setters ---
     public String getId() {
         return id;
     }
 
-    public void setId(String id) {
-        this.id = id;
-    }
-
     public double getCapacidadCarga() {
         return capacidadCarga;
-    }
-
-    public void setCapacidadCarga(double capacidadCarga) {
-        this.capacidadCarga = capacidadCarga;
     }
 
     public double getTara() {
         return tara;
     }
 
-    public void setTara(double tara) {
-        this.tara = tara;
-    }
-
     public double getCapacidadCombustible() {
         return capacidadCombustible;
     }
 
-    public void setCapacidadCombustible(double capacidadCombustible) {
-        this.capacidadCombustible = capacidadCombustible;
+    public int getInitialX() { // Added
+        return initialX;
+    }
+
+    public int getInitialY() { // Added
+        return initialY;
+    }
+
+    public double getConsumoCombustiblePorKm() { // Added
+        return consumoCombustiblePorKm;
+    }
+
+    public double getVelocidadPromedioKmPorMin() { // Added
+        return velocidadPromedioKmPorMin;
     }
 
     public static double getPesoTara() {

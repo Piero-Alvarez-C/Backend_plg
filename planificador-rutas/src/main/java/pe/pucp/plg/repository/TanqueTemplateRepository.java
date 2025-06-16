@@ -17,11 +17,11 @@ public class TanqueTemplateRepository {
         tanques.clear();
 
         // 🟢 Tanque principal (almacén central)
-        tanques.add(new TanqueTemplate(12, 8, 1000.0));
+        tanques.add(new TanqueTemplate("Almacen Central",12, 8, 1000.0));
 
         // 🟡 Tanques intermedios
-        tanques.add(new TanqueTemplate(42, 42, 160.0)); // Norte
-        tanques.add(new TanqueTemplate(63, 3, 160.0));  // Este
+        tanques.add(new TanqueTemplate("Tanque Norte", 42, 42, 160.0)); // Norte
+        tanques.add(new TanqueTemplate("Tanque Este", 63, 3, 160.0));  // Este
     }
 
     public List<TanqueTemplate> getTodos() {
