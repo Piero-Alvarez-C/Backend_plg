@@ -65,7 +65,7 @@ public class BloqueoServiceImpl implements BloqueoService {
         int d = Integer.parseInt(m.group(1));
         int h = Integer.parseInt(m.group(2));
         int mnt = Integer.parseInt(m.group(3));
-        return d * 1440 + h * 60 + mnt;
+        return (d-1) * 1440 + h * 60 + mnt;
     }
 
     @Override

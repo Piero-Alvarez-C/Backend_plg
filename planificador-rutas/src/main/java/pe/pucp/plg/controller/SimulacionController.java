@@ -89,8 +89,26 @@ public class SimulacionController {
             SimulationStatusDTO status = simulacionService.iniciarSimulacion(request);
             return ResponseEntity.ok(status);
         } catch (RuntimeException e) {
-            // Log the exception e.g. logger.error("Error starting simulation", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null); // Or a DTO with error details
+            System.err.println("Error starting simulation: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null); 
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 5) Obtener el snapshot de una simulación específica
+    // ------------------------------------------------------------
+    @GetMapping("/{simulationId}/snapshot")
+    public ResponseEntity<SimulacionSnapshotDTO> getSnapshot(@PathVariable String simulationId) {
+        try {
+            ExecutionContext context = simulationManagerService.getContextoSimulacion(simulationId);
+            if (context == null) {
+                throw new IllegalArgumentException("Simulación no encontrada con ID: " + simulationId);
+            }
+            SimulacionSnapshotDTO snapshot = MapperUtil.toSnapshotDTO(context);
+            return ResponseEntity.ok(snapshot);
+        } catch (Exception e) {
+            System.err.println("Error getting snapshot: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 }

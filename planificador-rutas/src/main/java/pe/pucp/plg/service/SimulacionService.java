@@ -85,58 +85,68 @@ public class SimulacionService {
      */
     public SimulationStatusDTO iniciarSimulacion(SimulationRequest request) {
         try {
-            // 1. Create a new simulation context via the manager.
+            // 1. Crear el contexto. Esta parte está bien.
             String simulationId = simulationManagerService.crearContextoSimulacion();
             ExecutionContext currentSimContext = simulationManagerService.getContextoSimulacion(simulationId);
-
+    
             if (currentSimContext == null) {
-                // This case should ideally not happen if crearContextoSimulacion was successful
-                // and returned a valid ID that getContextoSimulacion can immediately find.
-                throw new RuntimeException("Failed to retrieve newly created simulation context: " + simulationId);
+                throw new RuntimeException("No se pudo crear el contexto de simulación.");
             }
-
-            // 2. Load data from files specified in the request.
-            String contenidoPedidos = new String(archivoService.obtenerArchivo(request.getFileIdPedidos()), StandardCharsets.UTF_8);
-            String contenidoBloqueos = new String(archivoService.obtenerArchivo(request.getFileIdBloqueos()), StandardCharsets.UTF_8);
-            String contenidoAverias = new String(archivoService.obtenerArchivo(request.getFileIdAverias()), StandardCharsets.UTF_8);
-
-            // 3. Parse and populate the currentSimContext with data from files.
+    
+            // 2. C-FIX: Procesar cada archivo SOLO SI su ID fue proporcionado.
+    
+            // Pedidos (Asumimos que es obligatorio)
+            String fileIdPedidos = request.getFileIdPedidos();
+            if (fileIdPedidos == null || fileIdPedidos.isBlank()) {
+                throw new IllegalArgumentException("El archivo de pedidos es obligatorio.");
+            }
+            String contenidoPedidos = new String(archivoService.obtenerArchivo(fileIdPedidos), StandardCharsets.UTF_8);
             Map<Integer, List<Pedido>> pedidosPorTiempo = ParseadorArchivos.parsearPedidosPorTiempo(contenidoPedidos);
             currentSimContext.setPedidosPorTiempo(pedidosPorTiempo);
-            
             List<Pedido> initialPedidosFromFile = pedidosPorTiempo.getOrDefault(0, new ArrayList<>());
-            currentSimContext.setPedidos(new ArrayList<>(initialPedidosFromFile)); 
+            currentSimContext.setPedidos(new ArrayList<>(initialPedidosFromFile));
             if (currentSimContext.getPedidosPorTiempo().containsKey(0)) {
                  currentSimContext.getPedidosPorTiempo().remove(0); 
             }
-
-            List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqueos);
-            currentSimContext.setBloqueos(bloqueos);
-
-            Map<String, Map<String, String>> averiasPorTurno = ParseadorArchivos.parsearAverias(contenidoAverias);
-            currentSimContext.setAveriasPorTurno(averiasPorTurno);
+    
+            // Bloqueos (Opcional)
+            String fileIdBloqueos = request.getFileIdBloqueos();
+            if (fileIdBloqueos != null && !fileIdBloqueos.isBlank()) {
+                String contenidoBloqueos = new String(archivoService.obtenerArchivo(fileIdBloqueos), StandardCharsets.UTF_8);
+                List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqueos);
+                currentSimContext.setBloqueos(bloqueos);
+            }
+    
+            // Averías (Opcional)
+            String fileIdAverias = request.getFileIdAverias();
+            if (fileIdAverias != null && !fileIdAverias.isBlank()) {
+                String contenidoAverias = new String(archivoService.obtenerArchivo(fileIdAverias), StandardCharsets.UTF_8);
+                Map<String, Map<String, String>> averiasPorTurno = ParseadorArchivos.parsearAverias(contenidoAverias);
+                currentSimContext.setAveriasPorTurno(averiasPorTurno);
+            }
+    
+            // Mantenimientos (Opcional, si lo tienes)
+            // String fileIdMantenimientos = request.getFileIdMantenimientos();
+            // if (fileIdMantenimientos != null && !fileIdMantenimientos.isBlank()) { ... }
             
-            // Camiones and Tanques are initialized by the manager. 
-            // If the request implies a different fleet/tank setup (e.g., from other files),
-            // additional logic would be needed here to modify the context.
-
-            // Ensure lists that should start empty for this specific simulation are cleared.
+            // 3. Limpiar estados y preparar la respuesta DTO. Esta parte está bien.
             currentSimContext.getEventosEntrega().clear();
             currentSimContext.getAveriasAplicadas().clear();
             currentSimContext.getCamionesInhabilitados().clear();
-            currentSimContext.setRutas(new ArrayList<>()); // Clear any default/previous routes
-
-            // 4. Prepare response DTO.
-            String nombre = request.getNombreSimulacion() != null ? request.getNombreSimulacion() : "Simulación " + simulationId.substring(0, 8); // Shortened ID for name
+            currentSimContext.setRutas(new ArrayList<>());
+    
+            String nombre = request.getNombreSimulacion() != null ? request.getNombreSimulacion() : "Simulación " + simulationId.substring(0, 8);
             SimulationStatusDTO status = new SimulationStatusDTO();
             status.setSimulationId(simulationId);
             status.setNombreSimulacion(nombre);
             status.setEstado("INITIALIZED"); 
             status.setAvance(0);
-
+    
             return status;
-
+    
         } catch (Exception e) {
+            // Tu `System.err.println` me ayudó a encontrar esto. ¡Excelente!
+            System.err.println("Error starting simulation: " + e.getMessage());
             throw new RuntimeException("Error al iniciar simulación con request: " + e.getMessage(), e);
         }
     }
