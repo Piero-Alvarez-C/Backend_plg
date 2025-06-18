@@ -77,8 +77,8 @@ public class MapperUtil {
         dto.setId(est.getPlantilla().getId()); 
         dto.setPosX(est.getX()); // Corrected
         dto.setPosY(est.getY()); // Corrected
-        dto.setCapacidadDisponible(est.getCapacidadVolumetricaDisponible()); // Corrected
-        dto.setTiempoLibre(est.getTiempoLibre(tiempoActual)); // Corrected, requires tiempoActual
+        dto.setCapacidadDisponible(est.getCapacidadDisponible()); // Corrected
+        dto.setTiempoLibre(est.getTiempoLibre()); // Corrected, requires tiempoActual
         dto.setTara(est.getPlantilla().getTara()); 
         dto.setCombustibleDisponible(est.getCombustibleActual()); // Corrected
         return dto;

@@ -212,7 +212,7 @@ public class OperationService {
             return false;
         }
         // operationalContext already fetched
-        camion.reset(operationalContext.getDepositoX(), operationalContext.getDepositoY()); 
+        camion.reset(); 
         operationalContext.getCamionesInhabilitados().remove(id); 
         System.out.println("Camion " + id + " reset in operational context.");
         return true;
@@ -228,7 +228,7 @@ public class OperationService {
         if (camion == null || operationalContext.getCamionesInhabilitados().contains(id)) {
             return false;
         }
-        camion.avanzarPasoEnRutaActual(); 
+        camion.avanzarUnPaso(); 
         System.out.println("Camion " + id + " advanced one step in operational context.");
         return true;
     }
@@ -242,7 +242,7 @@ public class OperationService {
         if (camion == null) {
             return false;
         }
-        camion.recargarCombustibleAlMaximo(); 
+        camion.recargarCombustible(); 
         System.out.println("Camion " + id + " refueled in operational context.");
         return true;
     }
