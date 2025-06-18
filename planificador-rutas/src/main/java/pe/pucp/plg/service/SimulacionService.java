@@ -26,7 +26,7 @@ public class SimulacionService {
     public SimulacionService(SimulationManagerService simulationManagerService,
                              ArchivoService archivoService) {
         this.simulationManagerService = simulationManagerService;
-        this.acoPlanner = new ACOPlanner(); // Instantiate as POJO
+        this.acoPlanner = new ACOPlanner(); 
         this.archivoService = archivoService;
     }
 

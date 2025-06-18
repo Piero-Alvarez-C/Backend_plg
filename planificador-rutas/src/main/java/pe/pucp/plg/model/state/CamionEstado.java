@@ -24,7 +24,8 @@ public class CamionEstado {
     }
 
     private final CamionTemplate plantilla;
-    private Point posicionActual;
+    private int x = 12;
+    private int y = 8;
     private double combustibleActual;
     private double cargaActualVolumen;
     private TruckStatus status;
@@ -40,7 +41,8 @@ public class CamionEstado {
 
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
-        this.posicionActual = new Point(initialX, initialY);
+        this.x = initialX;
+        this.y = initialY;
         this.combustibleActual = plantilla.getCapacidadCombustible();
         this.cargaActualVolumen = 0;
         this.pedidosCargados = new ArrayList<>();
@@ -55,7 +57,8 @@ public class CamionEstado {
 
     public CamionEstado(CamionEstado original) {
         this.plantilla = original.plantilla; 
-        this.posicionActual = new Point(original.posicionActual.x, original.posicionActual.y);
+        this.x = original.x;
+        this.y = original.y;
         this.combustibleActual = original.combustibleActual;
         this.cargaActualVolumen = original.cargaActualVolumen;
         this.pedidosCargados = new ArrayList<>();
@@ -79,7 +82,8 @@ public class CamionEstado {
 
     // Getters
     public CamionTemplate getPlantilla() { return plantilla; }
-    public Point getPosicionActual() { return posicionActual; }
+    public int getX() { return x; }
+    public int getY() { return y; }
     public double getCombustibleActual() { return combustibleActual; }
     public double getCargaActualVolumen() { return cargaActualVolumen; }
     public List<Pedido> getPedidosCargados() { return Collections.unmodifiableList(pedidosCargados); }
@@ -96,9 +100,12 @@ public class CamionEstado {
     public void setTiempoLibre(int nuevoTiempoOcupadoHasta) { 
         this.tiempoOcupadoHasta = nuevoTiempoOcupadoHasta; 
     }
-    public void setPosicionActual(Point nuevaPosicion) { 
-        this.posicionActual = new Point(nuevaPosicion.x, nuevaPosicion.y);
+    public void setX(int x) { 
+        this.x = x;
     }
+    public void setY(int y) { 
+        this.y = y; 
+    }   
     public void setStatus(TruckStatus newStatus) {
         this.status = newStatus;
     }
@@ -110,7 +117,8 @@ public class CamionEstado {
     }
 
     public void reset(int initialX, int initialY) {
-        this.posicionActual = new Point(initialX, initialY);
+        this.x = initialX;
+        this.y = initialY;
         this.combustibleActual = plantilla.getCapacidadCombustible();
         this.cargaActualVolumen = 0;
         this.pedidosCargados.clear();
@@ -158,15 +166,17 @@ public class CamionEstado {
         Point proximoPunto = rutaActual.get(proximoPuntoRutaIndex);
 
         // Store current position before moving
-        Point posicionAnterior = new Point(this.posicionActual.x, this.posicionActual.y);
+        int posicionAnteriorX = this.getX();
+        int posicionAnteriorY = this.getY();
 
         // 3. Move to the next point.
         // This assumes that each point in 'rutaActual' represents a location reachable in one "step"
         // or that the movement logic here is simplified to an instant jump to the next point in the list.
-        this.posicionActual = new Point(proximoPunto.x, proximoPunto.y);
+        this.setX(proximoPunto.x);
+        this.setY(proximoPunto.y);
 
         // 4. Consume fuel based on actual distance moved in this step.
-        double distanciaEstePaso = calcularDistanciaManhattan(posicionAnterior, this.posicionActual);
+        double distanciaEstePaso = calcularDistanciaManhattan(new Point(posicionAnteriorX, posicionAnteriorY), new Point(this.getX(), this.getY()));
         double consumoCalculadoEstePaso = distanciaEstePaso * plantilla.getConsumoCombustiblePorKm();
         this.combustibleActual -= consumoCalculadoEstePaso;
 
@@ -222,7 +232,7 @@ public class CamionEstado {
         this.tanqueDestinoRecarga = tanqueRecarga;
 
         if (nuevaRuta.isEmpty()) {
-            this.status = (posicionActual.x == plantilla.getInitialX() && posicionActual.y == plantilla.getInitialY()) ? TruckStatus.IDLE : TruckStatus.AVAILABLE;
+            this.status = (this.getX() == plantilla.getInitialX() && this.getY() == plantilla.getInitialY()) ? TruckStatus.IDLE : TruckStatus.AVAILABLE;
             this.tiempoOcupadoHasta = tiempoActual; // Free now
             return;
         }
@@ -238,10 +248,12 @@ public class CamionEstado {
         }
         
         double distanciaTotal = 0;
-        Point puntoPrev = posicionActual;
+        int puntoPrevX = this.getX();
+        int puntoPrevY = this.getY();
         for(Point punto : nuevaRuta) {
-            distanciaTotal += calcularDistanciaManhattan(puntoPrev, punto);
-            puntoPrev = punto;
+            distanciaTotal += calcularDistanciaManhattan(new Point(puntoPrevX, puntoPrevY), punto);
+            puntoPrevX = punto.x;
+            puntoPrevY = punto.y;
         }
         int tiempoEstimadoViaje = 0;
         if (plantilla.getVelocidadPromedioKmPorMin() > 0) {
@@ -259,7 +271,7 @@ public class CamionEstado {
     }
 
     public void recargarCombustibleAlMaximo(TanqueDinamico tanque) { // Called when AT the tank, by ACO or simulation step
-        if (tanque != null && posicionActual.equals(new Point(tanque.getPosX(), tanque.getPosY()))) {
+        if (tanque != null && this.getX() == tanque.getPosX() && this.getY() == tanque.getPosY()) {
             // This method is now more of a trigger; actual refueling time/logic handled by avanzarPasoEnRutaActual or time progression
             // For immediate effect if called outside simulation loop:
             double cantidadNecesaria = plantilla.getCapacidadCombustible() - combustibleActual;
@@ -296,7 +308,7 @@ public class CamionEstado {
 
     public void realizarEntrega(Pedido pedido, int tiempoActual) { // Called when AT delivery point and unloading time is up
         Objects.requireNonNull(pedido, "El pedido no puede ser nulo.");
-        if (pedidosCargados.contains(pedido) && posicionActual.equals(new Point(pedido.getX(), pedido.getY()))) {
+        if (pedidosCargados.contains(pedido) && this.getX() == pedido.getX() && this.getY() == pedido.getY()) {
             pedidosCargados.remove(pedido);
             if (!pedidosAsignadosEnRutaActual.isEmpty() && pedidosAsignadosEnRutaActual.get(0).equals(pedido)) {
                 pedidosAsignadosEnRutaActual.remove(0);
@@ -324,7 +336,8 @@ public class CamionEstado {
     }
 
     public void teleportTo(Point newPosition) { // For event processing
-        this.posicionActual = new Point(newPosition.x, newPosition.y);
+        this.setX(newPosition.x);
+        this.setY(newPosition.y);
     }
 
     public CamionEstado deepClone() {
@@ -342,7 +355,7 @@ public class CamionEstado {
                tiempoOcupadoHasta == that.tiempoOcupadoHasta &&
                Double.compare(that.consumoTotalRutaProvisional, consumoTotalRutaProvisional) == 0 &&
                Objects.equals(plantilla.getId(), that.plantilla.getId()) && // Compare by ID for template
-               Objects.equals(posicionActual, that.posicionActual) &&
+               Objects.equals(new Point(this.getX(), this.getY()), new Point(that.getX(), that.getY())) &&
                Objects.equals(pedidosCargados, that.pedidosCargados) &&
                Objects.equals(rutaActual, that.rutaActual) &&
                Objects.equals(pedidosAsignadosEnRutaActual, that.pedidosAsignadosEnRutaActual) &&
@@ -353,7 +366,7 @@ public class CamionEstado {
 
     @Override
     public int hashCode() {
-        return Objects.hash(plantilla.getId(), posicionActual, combustibleActual, cargaActualVolumen, pedidosCargados, 
+        return Objects.hash(plantilla.getId(), new Point(this.getX(), this.getY()), combustibleActual, cargaActualVolumen, pedidosCargados, 
                           rutaActual, proximoPuntoRutaIndex, pedidosAsignadosEnRutaActual, 
                           (tanqueDestinoRecarga != null ? tanqueDestinoRecarga.getId() : null),
                           status, tiempoOcupadoHasta, consumoTotalRutaProvisional);
@@ -364,7 +377,7 @@ public class CamionEstado {
         return "CamionEstado{" +
                "id=" + plantilla.getId() +
                ", status=" + status +
-               ", pos=" + posicionActual.x + "," + posicionActual.y +
+               ", pos=" + this.getX() + "," + this.getY() +
                ", comb=" + String.format("%.2f", combustibleActual) +
                ", cargaV=" + String.format("%.2f", cargaActualVolumen) +
                ", pedidosCargados=" + pedidosCargados.size() +

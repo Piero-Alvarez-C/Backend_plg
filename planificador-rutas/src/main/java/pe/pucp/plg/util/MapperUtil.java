@@ -18,8 +18,8 @@ public class MapperUtil {
     public static CamionDTO toCamionDTO(CamionEstado camion) {
         CamionDTO dto = new CamionDTO();
         dto.setId(camion.getPlantilla().getId()); 
-        dto.setX(camion.getPosicionActual().x); // Corrected
-        dto.setY(camion.getPosicionActual().y); // Corrected
+        dto.setX(camion.getX()); // Corrected
+        dto.setY(camion.getY()); // Corrected
         dto.setDisponible(camion.getPlantilla().getCapacidadCarga()); 
         dto.setCombustibleDisponible(camion.getCombustibleActual()); // Corrected
         dto.setStatus(camion.getStatus().name());
@@ -75,8 +75,8 @@ public class MapperUtil {
     public static CamionEstadoDTO toCamionEstadoDTO(CamionEstado est, int tiempoActual) {
         CamionEstadoDTO dto = new CamionEstadoDTO();
         dto.setId(est.getPlantilla().getId()); 
-        dto.setPosX(est.getPosicionActual().x); // Corrected
-        dto.setPosY(est.getPosicionActual().y); // Corrected
+        dto.setPosX(est.getX()); // Corrected
+        dto.setPosY(est.getY()); // Corrected
         dto.setCapacidadDisponible(est.getCapacidadVolumetricaDisponible()); // Corrected
         dto.setTiempoLibre(est.getTiempoLibre(tiempoActual)); // Corrected, requires tiempoActual
         dto.setTara(est.getPlantilla().getTara()); 
