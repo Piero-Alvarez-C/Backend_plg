@@ -1,7 +1,6 @@
 package pe.pucp.plg.model.common;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class Ruta {
@@ -22,7 +21,7 @@ public class Ruta {
 
     // Getter for pedidoIds
     public List<Integer> getPedidoIds() {
-        return Collections.unmodifiableList(pedidoIds);
+        return pedidoIds;
     }
 
     public void addPedidoId(Integer pedidoId) {

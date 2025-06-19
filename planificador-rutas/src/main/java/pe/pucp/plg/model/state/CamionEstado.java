@@ -82,8 +82,8 @@ public class CamionEstado {
     public int getY() { return y; }
     public double getCombustibleActual() { return combustibleActual; }
     public double getCapacidadDisponible() { return capacidadDisponible; }
-    public List<Pedido> getPedidosCargados() { return Collections.unmodifiableList(pedidosCargados); }
-    public List<Point> getRutaActual() { return Collections.unmodifiableList(rutaActual); }
+    public List<Pedido> getPedidosCargados() { return pedidosCargados; }
+    public List<Point> getRutaActual() { return rutaActual; }
     public int getPasoActual() { return pasoActual; }
     public TanqueDinamico getTanqueDestinoRecarga() { return reabastecerEnTanque; } // Alias for getTanqueDestinoRuta
     public TruckStatus getStatus() { return status; }
@@ -93,7 +93,7 @@ public class CamionEstado {
     public int getRetStartY() { return retStartY; }
     public int getRetDestX() { return retDestX; }
     public int getRetDestY() { return retDestY; }
-    public List<Point> getHistory() { return Collections.unmodifiableList(history); }
+    public List<Point> getHistory() { return history; }
     public boolean getEnRetorno() { return enRetorno; }
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public double getCombustibleGastado() { return combustibleGastado; }
@@ -138,6 +138,11 @@ public class CamionEstado {
     public boolean estaEnDestinoDeRuta() {
         if (!tieneRutaAsignada()) return true;
         return pasoActual >= rutaActual.size();
+    }
+
+    public boolean estaLibre(int tiempoActual) {
+        return (this.status == TruckStatus.AVAILABLE) && 
+               this.tiempoOcupadoHasta <= tiempoActual;
     }
 
     public void recargarCombustible() { 
