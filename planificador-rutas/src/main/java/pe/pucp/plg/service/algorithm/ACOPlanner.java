@@ -1,13 +1,13 @@
 package pe.pucp.plg.service.algorithm;
 
 import org.springframework.stereotype.Service;
+
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.state.CamionEstado;
 
 import java.util.*;
-import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,22 +20,17 @@ public class ACOPlanner {
     private static final double RHO = 0.1;     // evaporación
     private static final double Q = 100.0;     // feromona depositada
 
-    public List<Ruta> planificarRutas(ExecutionContext contexto) {
-        int tiempoActual = contexto.getCurrentTime();
-
-        // 1. Construir una lista de clones de los camiones disponibles para la planificación.
-        List<CamionEstado> flotaParaPlanificar = contexto.getCamiones().stream()
-                .filter(c -> c.getStatus() == CamionEstado.TruckStatus.AVAILABLE)
-                .map(CamionEstado::new) // Usa el constructor de copia para crear clones
-                .collect(Collectors.toList());
-
-        // 2. Determinar los pedidos candidatos para la planificación.
-        List<Pedido> candidatos = contexto.getPedidos().stream()
-                .filter(p -> !p.isAtendido() && !p.isDescartado() && !p.isProgramado() && p.getTiempoCreacion() <= tiempoActual)
-                .collect(Collectors.toList());
-
+    public List<Ruta> planificarRutas(List<Pedido> candidatos, List<CamionEstado> flotaParaPlanificar, int tiempoActual, ExecutionContext contexto) {
         if (candidatos.isEmpty() || flotaParaPlanificar.isEmpty()) {
             return Collections.emptyList();
+        }
+
+        Set<Integer> idsCandidatos = candidatos.stream()
+                .map(Pedido::getId)
+                .collect(Collectors.toSet());
+        contexto.getEventosEntrega().removeIf(e -> idsCandidatos.contains(e.getPedido().getId()));
+        for(Pedido p : candidatos) {
+            p.setProgramado(false);
         }
 
         // 3. Ejecutar ACO con los clones y candidatos.

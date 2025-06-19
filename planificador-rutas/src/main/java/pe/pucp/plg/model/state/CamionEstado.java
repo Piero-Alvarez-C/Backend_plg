@@ -12,8 +12,9 @@ public class CamionEstado {
 
     public enum TruckStatus {
         AVAILABLE,      // Disponible para nuevas asignaciones
-        DELIVERING,     // En proceso de descarga en un punto de entrega
-        RETURNING      // Regresando al depósito o a un tanque
+        DELIVERING,     // En ruta para descargar o recargar
+        RETURNING,      // Regresando al depósito o a un tanque
+        PROCESSING      // Procesando un pedido
     }
 
     // === Referencia a la plantilla ===
