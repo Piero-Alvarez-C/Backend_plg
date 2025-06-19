@@ -1,9 +1,8 @@
 package pe.pucp.plg.service.Impl;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.model.common.Bloqueo;
-import pe.pucp.plg.model.context.SimulacionEstado;
+import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.service.BloqueoService;
 
 import java.awt.*;
@@ -15,8 +14,6 @@ import java.util.List;
 @Service
 public class BloqueoServiceImpl implements BloqueoService {
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
-    @Autowired
-    private SimulacionEstado simulacionEstado;
     @Override
     public boolean estaActivo(Bloqueo b, int tiempo) {
         return tiempo >= b.getStartMin() && tiempo < b.getEndMin();
@@ -68,10 +65,11 @@ public class BloqueoServiceImpl implements BloqueoService {
         int d = Integer.parseInt(m.group(1));
         int h = Integer.parseInt(m.group(2));
         int mnt = Integer.parseInt(m.group(3));
-        return d * 1440 + h * 60 + mnt;
+        return (d-1) * 1440 + h * 60 + mnt;
     }
+
     @Override
-    public List<Bloqueo> listarTodos() {
-        return simulacionEstado.getBloqueos();
+    public List<Bloqueo> listarTodos(ExecutionContext context) {
+        return context.getBloqueos();
     }
 }

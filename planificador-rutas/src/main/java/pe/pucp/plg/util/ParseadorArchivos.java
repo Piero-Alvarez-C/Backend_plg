@@ -24,7 +24,7 @@ public class ParseadorArchivos {
                 int dia = Integer.parseInt(tiempoTexto.substring(0, 2));
                 int hora = Integer.parseInt(tiempoTexto.substring(3, 5));
                 int minuto = Integer.parseInt(tiempoTexto.substring(6, 8));
-                int tiempoCreacion = dia * 1440 + hora * 60 + minuto;
+                int tiempoCreacion = (dia-1) * 1440 + hora * 60 + minuto;
 
                 int x = Integer.parseInt(datos[0]);
                 int y = Integer.parseInt(datos[1]);

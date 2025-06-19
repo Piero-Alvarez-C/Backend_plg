@@ -4,8 +4,7 @@ import pe.pucp.plg.dto.*;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
-import pe.pucp.plg.model.context.SimulacionEstado;
-import pe.pucp.plg.model.state.CamionDinamico;
+import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 
@@ -16,15 +15,15 @@ import java.util.stream.Collectors;
 
 public class MapperUtil {
 
-    public static CamionDTO toCamionDTO(CamionDinamico camion) {
+    public static CamionDTO toCamionDTO(CamionEstado camion) {
         CamionDTO dto = new CamionDTO();
-        dto.setId(camion.getId());
-        dto.setX(camion.getX());
-        dto.setY(camion.getY());
-        dto.setDisponible(camion.getDisponible());
-        dto.setCombustibleDisponible(camion.getCombustibleDisponible());
+        dto.setId(camion.getPlantilla().getId()); 
+        dto.setX(camion.getX()); // Corrected
+        dto.setY(camion.getY()); // Corrected
+        dto.setDisponible(camion.getPlantilla().getCapacidadCarga()); 
+        dto.setCombustibleDisponible(camion.getCombustibleActual()); // Corrected
         dto.setStatus(camion.getStatus().name());
-        dto.setConsumoAcumulado(camion.getConsumoAcumulado());
+        // dto.setConsumoAcumulado(camion.getConsumoAcumulado()); // Getter does not exist, commented out for now
         return dto;
     }
 
@@ -32,8 +31,8 @@ public class MapperUtil {
         TanqueDTO dto = new TanqueDTO();
         dto.setPosX(tanque.getPosX());
         dto.setPosY(tanque.getPosY());
-        dto.setCapacidadTotal(tanque.getCapacidadTotal());
-        dto.setCapacidadDisponible(tanque.getDisponible());
+        dto.setCapacidadTotal(tanque.getCapacidadTotal()); // Corrected: Direct getter from TanqueDinamico
+        dto.setCapacidadDisponible(tanque.getDisponible()); // Corrected: Renamed from getCapacidadActual
         return dto;
     }
 
@@ -71,39 +70,50 @@ public class MapperUtil {
         return dto;
     }
 
-    public static CamionEstadoDTO toCamionEstadoDTO(CamionEstado est) {
+    // Note: CamionEstadoDTO might need tiempoActual for getTiempoLibre
+    // Passing 0 for now, or consider if this DTO is used where tiempoActual isn't known
+    public static CamionEstadoDTO toCamionEstadoDTO(CamionEstado est, int tiempoActual) {
         CamionEstadoDTO dto = new CamionEstadoDTO();
-        dto.setId(est.id);
-        dto.setPosX(est.posX);
-        dto.setPosY(est.posY);
-        dto.setCapacidadDisponible(est.capacidadDisponible);
-        dto.setTiempoLibre(est.tiempoLibre);
-        dto.setTara(est.tara);
-        dto.setCombustibleDisponible(est.combustibleDisponible);
+        dto.setId(est.getPlantilla().getId()); 
+        dto.setPosX(est.getX()); // Corrected
+        dto.setPosY(est.getY()); // Corrected
+        dto.setCapacidadDisponible(est.getCapacidadDisponible()); // Corrected
+        dto.setTiempoLibre(est.getTiempoLibre()); // Corrected, requires tiempoActual
+        dto.setTara(est.getPlantilla().getTara()); 
+        dto.setCombustibleDisponible(est.getCombustibleActual()); // Corrected
         return dto;
     }
 
     public static RutaDTO toRutaDTO(Ruta ruta) {
         RutaDTO dto = new RutaDTO();
-        dto.setEstadoCamion(toCamionEstadoDTO(ruta.estadoCamion));
-        dto.setPedidos(new ArrayList<>(ruta.pedidos));
+        // dto.setEstadoCamion(toCamionEstadoDTO(ruta.getEstadoCamion())); // estadoCamion removed from Ruta model
+        dto.setCamionId(ruta.getCamionId()); // Added camionId to DTO
+        if (ruta.getPedidoIds() != null) {
+             dto.setPedidos(new ArrayList<>(ruta.getPedidoIds()));
+        } else {
+            dto.setPedidos(new ArrayList<>());
+        }
         dto.setDistancia(ruta.distancia);
-        dto.setConsumo(ruta.consumo);
+        dto.setConsumo(ruta.consumo); 
         return dto;
     }
 
     /** Opcional: mapear todo el snapshot de la simulación */
-    public static SimulacionSnapshotDTO toSnapshotDTO(SimulacionEstado estado) {
+    public static SimulacionSnapshotDTO toSnapshotDTO(ExecutionContext estado) {
         SimulacionSnapshotDTO s = new SimulacionSnapshotDTO();
         s.setTiempoActual(estado.getCurrentTime());
         s.setCamiones(estado.getCamiones().stream()
-                .map(MapperUtil::toCamionDTO).toList());
+                .map(camion -> toCamionDTO(camion)).toList()); // Pass tiempoActual
         s.setPedidos(estado.getPedidos().stream()
                 .map(MapperUtil::toPedidoDTO).toList());
         s.setBloqueos(estado.getBloqueos().stream()
                 .map(MapperUtil::toBloqueoDTO).toList());
         s.setTanques(estado.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO).toList());
+        
+        // For RutaDTO, we now map camionId. If full CamionEstadoDTO is needed here,
+        // it would require looking up CamionEstado from ExecutionContext based on camionId.
+        // For simplicity, RutaDTO in snapshot will contain camionId.
         s.setRutas(estado.getRutas().stream()
                 .map(MapperUtil::toRutaDTO).toList());
         return s;

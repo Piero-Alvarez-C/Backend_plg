@@ -1,46 +1,23 @@
 package pe.pucp.plg.model.context;
 
-import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.EntregaEvent;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
-import pe.pucp.plg.model.state.CamionDinamico;
+import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
-import pe.pucp.plg.service.BloqueoService;
-import pe.pucp.plg.service.CamionService;
-import pe.pucp.plg.service.TanqueService;
-import pe.pucp.plg.util.ParseadorArchivos;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
-@Component
-public class SimulacionEstado {
-
-    // ————— Inyectar los servicios que proveen datos de camiones, tanques y bloqueos —————
-    @Autowired
-    private CamionService camionService;
-
-    @Autowired @Lazy
-    private TanqueService tanqueService;
-
-    @Autowired @Lazy
-    private BloqueoService bloqueoService;
+public class ExecutionContext {
 
     private AtomicInteger pedidoSeq = new AtomicInteger(1000);
     public int generateUniquePedidoId() {
         return pedidoSeq.getAndIncrement();
     }
     // 1) Estados de la flota
-    private List<CamionDinamico> camiones = new ArrayList<>();
+    private List<CamionEstado> camiones = new ArrayList<>();
 
     // 2) Tanques intermedios
     private List<TanqueDinamico> tanques = new ArrayList<>();
@@ -83,8 +60,8 @@ public class SimulacionEstado {
 
     // ————— GETTERS y SETTERS (tal como los tienes) —————
 
-    public List<CamionDinamico> getCamiones() { return camiones; }
-    public void setCamiones(List<CamionDinamico> camiones) { this.camiones = camiones; }
+    public List<CamionEstado> getCamiones() { return camiones; }
+    public void setCamiones(List<CamionEstado> camiones) { this.camiones = camiones; }
 
     public List<TanqueDinamico> getTanques() { return tanques; }
     public void setTanques(List<TanqueDinamico> tanques) { this.tanques = tanques; }
@@ -133,56 +110,6 @@ public class SimulacionEstado {
                 .filter(t -> t.getPosX() == x && t.getPosY() == y)
                 .findFirst()
                 .orElse(null);
-    }
-
-
-    // ————— Método que ya tenías para pedidos iniciales —————
-    @PostConstruct
-    public void init() {
-        // —— 1️⃣ Pedidos ——
-        try {
-            var pedidoRes = new ClassPathResource("pedidos.txt");
-            String contenidoPedidos = Files.readString(pedidoRes.getFile().toPath(), StandardCharsets.UTF_8);
-
-            // Agrupo pedidos por tiempo de creación
-            pedidosPorTiempo = ParseadorArchivos
-                    .parsearPedidos(contenidoPedidos)
-                    .stream()
-                    .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
-
-            // Inicializo pedidos activos (solo los de t=0)
-            pedidos = new ArrayList<>();
-            if (pedidosPorTiempo.containsKey(0)) {
-                pedidos.addAll(pedidosPorTiempo.remove(0));
-            }
-            System.out.println("✅ Pedidos iniciales: " + pedidos.size());
-        } catch (Exception e) {
-            System.err.println("❌ Error cargando pedidos: " + e.getMessage());
-            pedidosPorTiempo = new HashMap<>();
-            pedidos = new ArrayList<>();
-        }
-
-        // —— 2️⃣ Camiones ——
-        camiones = camionService.inicializarFlota();
-        System.out.println("✅ Camiones cargados: " + camiones.size());
-
-        // —— 3️⃣ Tanques ——
-        tanques = tanqueService.inicializarTanques();
-        System.out.println("✅ Tanques inicializados: " + tanques.size());
-
-        // —— 4️⃣ Bloqueos ——
-        try {
-            var bloqueoRes = new ClassPathResource("bloqueos.txt");
-            String contenidoBloqs = Files.readString(bloqueoRes.getFile().toPath(), StandardCharsets.UTF_8);
-            bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqs);
-            System.out.println("✅ Bloqueos cargados: " + bloqueos.size());
-        } catch (Exception e) {
-            System.err.println("❌ Error cargando bloqueos: " + e.getMessage());
-            bloqueos = new ArrayList<>();
-        }
-
-        // —— 5️⃣ Tiempo inicial ——
-        currentTime = 0;
     }
 
 }

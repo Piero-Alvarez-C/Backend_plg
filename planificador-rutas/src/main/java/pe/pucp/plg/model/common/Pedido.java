@@ -5,12 +5,25 @@ public class Pedido {
     double volumen;
     boolean atendido = false;
     boolean descartado = false;
-    boolean programado = false;   // ⬅ Nuevo campo
+    boolean programado = false; 
 
     public Pedido(int id, int tiempoCreacion, int x, int y, double volumen, int tiempoLimite) {
         this.id = id; this.tiempoCreacion = tiempoCreacion;
         this.x = x; this.y = y; this.volumen = volumen;
         this.tiempoLimite = tiempoLimite;
+    }
+
+    // Copy constructor
+    public Pedido(Pedido original) {
+        this.id = original.id;
+        this.x = original.x;
+        this.y = original.y;
+        this.tiempoCreacion = original.tiempoCreacion;
+        this.tiempoLimite = original.tiempoLimite;
+        this.volumen = original.volumen;
+        this.atendido = original.atendido;
+        this.descartado = original.descartado;
+        this.programado = original.programado;
     }
     // → getters para la tabla de pedidos:
     public int getId() { return id; }
