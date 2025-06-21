@@ -2,6 +2,8 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import pe.pucp.plg.dto.*;
+import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 
@@ -9,16 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors; // Added
 
-import pe.pucp.plg.model.state.CamionEstado; 
-import pe.pucp.plg.dto.BloqueoDTO; // Added
-import pe.pucp.plg.dto.CamionDTO; 
-import pe.pucp.plg.dto.PedidoDTO; 
-import pe.pucp.plg.dto.TanqueDTO; // Added
-import pe.pucp.plg.util.MapperUtil; 
+import pe.pucp.plg.model.state.CamionEstado;
+import pe.pucp.plg.util.MapperUtil;
 
 @Service
 public class OperationService {
 
+    @Autowired
+    private EventPublisherService eventPublisher;
     private final SimulationManagerService simulationManagerService;
 
     @Autowired
@@ -160,7 +160,10 @@ public class OperationService {
                 dto.getVolumen(), dto.getTiempoLimite());
         
         // Use the existing registrarNuevoPedido logic which handles adding to current or future pedidos
-        registrarNuevoPedido(nuevo); 
+        registrarNuevoPedido(nuevo);
+        PedidoDTO nuevoDTO = MapperUtil.toPedidoDTO(nuevo);
+        EventDTO evento = EventDTO.of(EventType.ORDER_CREATED, nuevoDTO);
+        eventPublisher.publicarEventoOperacion(evento);
         return nuevo;
     }
 

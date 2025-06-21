@@ -13,11 +13,18 @@ public class EventDTO {
     private Object payload;
     private long timestamp;
 
-    public static EventDTO of(EventType type, Object payload) {
-        return new EventDTO();
+    public EventDTO() {}
+
+    public EventDTO(EventType type, Object payload, long timestamp) {
+        this.type = type;
+        this.payload = payload;
+        this.timestamp = timestamp;
     }
 
-    // Getters y setters
+    public static EventDTO of(EventType type, Object payload) {
+        return new EventDTO(type, payload, System.currentTimeMillis());
+    }
+
     public EventType getType() { return type; }
     public void setType(EventType type) { this.type = type; }
 
