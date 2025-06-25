@@ -344,24 +344,27 @@ public class SimulacionService {
         String turnoActual = turnoDeMinuto(tiempoActual);
         
         // Si cambió el turno, limpiar estados de averías anteriores
+
         if (!turnoActual.equals(contexto.getTurnoAnterior())) {
             contexto.setTurnoAnterior(turnoActual);
             contexto.getAveriasAplicadas().clear();
-            contexto.getCamionesInhabilitados().clear();
+            contexto.getCamionesInhabilitados().clear();          
         }
         
         // Aplicar averías programadas para este turno
         Map<String, String> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
+
         for (Map.Entry<String, String> entry : averiasTurno.entrySet()) {
             String key = turnoActual + "_" + entry.getKey();
             if (contexto.getAveriasAplicadas().contains(key)) continue;
             
             CamionEstado c = findCamion(entry.getKey(), contexto);
+            //System.out.printf("📌 TgetTiempoLibre: %d%n", c.getTiempoLibre());
+            //System.out.printf("📌 tiempoActual : %d%n",tiempoActual);
             if (c != null && c.getTiempoLibre() <= tiempoActual) {
                 // Determinar penalización según tipo de avería
-                int penal = entry.getValue().equals("T1") ? 30 : 
-                           entry.getValue().equals("T2") ? 60 : 90;
-                           
+                String tipoaveria = entry.getValue();
+                int penal=calcularTiempoAveria(turnoActual,tipoaveria,tiempoActual);           
                 c.setTiempoLibre(tiempoActual + penal);
                 contexto.getAveriasAplicadas().add(key);
                 contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
@@ -686,6 +689,54 @@ public class SimulacionService {
         else if (mod < 960) return "T2";
         else return "T3";
     }
+
+
+    public static int calcularTiempoAveria(String turnoActual, String tipoIncidente  ,int tiempoActual) {
+        int inactividad = 0;
+
+        switch (tipoIncidente) {
+            case "T1":
+                // Tipo 1: 2 horas en sitio (120 minutos)
+                inactividad = 120;
+                break;
+
+            case "T2":
+                // Tipo 2: 2 horas en sitio + 1 turno en taller
+                inactividad = 120;  // Inmovilización inicial
+
+                switch (turnoActual) {
+                    case "T1":
+                        // Disponible en turno 3 del mismo día
+                        inactividad += (480 * 1);  // Turno 2 completo
+                        break;
+                    case "T2":
+                        // Disponible en turno 1 del día siguiente
+                        inactividad += (480 * 2);  // Turno 3 + Turno 1
+                        break;
+                    case "T3":
+                        // Disponible en turno 2 del día siguiente
+                        inactividad += (480 * 3);  // Turno 1 + Turno 2
+                        break;
+                }
+                break;
+
+            case "T3":
+                // Tipo 3: 4 horas en sitio + 1 día completo en taller (día A+2, Turno 1)
+                inactividad = 240;  // Inmovilización inicial
+
+                int minutosRestantesDelDia = 1440 - (tiempoActual % 1440);
+                inactividad += minutosRestantesDelDia; // Resto del día actual
+                inactividad += 1440 * 2;     // Dos días completos más (Día A+1 y Día A+2)
+                break;
+
+            default:
+                System.out.println("Tipo de incidente desconocido: " + tipoIncidente);
+                break;
+        }
+
+        return inactividad;
+    }
+
 
     private boolean isBlockedMove(int x, int y, int t, ExecutionContext estado) {
         for (Bloqueo b : estado.getBloqueos()) {
