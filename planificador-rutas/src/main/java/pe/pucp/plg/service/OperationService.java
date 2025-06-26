@@ -108,6 +108,12 @@ public class OperationService {
         if (nuevosPedidosParaEsteMinuto != null && !nuevosPedidosParaEsteMinuto.isEmpty()) {
             operationalContext.getPedidos().addAll(nuevosPedidosParaEsteMinuto);
             System.out.println("Activated " + nuevosPedidosParaEsteMinuto.size() + " new pedidos at time " + nuevoTiempo);
+            // Emitir eventos ORDER_CREATED para cada pedido activado
+            for (Pedido pedido : nuevosPedidosParaEsteMinuto) {
+                PedidoDTO dto = MapperUtil.toPedidoDTO(pedido);
+                EventDTO pedidoEvent = EventDTO.of(EventType.ORDER_CREATED, dto);
+                eventPublisher.publicarEventoOperacion(pedidoEvent);
+            }
         }
 
         // Advance each truck in the operational context
@@ -123,7 +129,7 @@ public class OperationService {
     }
 
     public List<CamionDTO> getListaCamionesOperacionalesDTO() {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
+            ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
@@ -218,6 +224,15 @@ public class OperationService {
         camion.reset(); 
         operationalContext.getCamionesInhabilitados().remove(id); 
         System.out.println("Camion " + id + " reset in operational context.");
+        // Emitir evento TRUCK_STATE_UPDATED
+        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
+        EventDTO estadoEvento = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
+        eventPublisher.publicarEventoOperacion(estadoEvento);
+
+        // Emitir evento ACTION_COMPLETED con acción RESET
+        TruckActionEventDTO accionEvento = new TruckActionEventDTO(id, "RESET");
+        EventDTO accionEventoDTO = EventDTO.of(EventType.ACTION_COMPLETED, accionEvento);
+        eventPublisher.publicarEventoOperacion(accionEventoDTO);
         return true;
     }
 
@@ -233,6 +248,10 @@ public class OperationService {
         }
         camion.avanzarUnPaso(); 
         System.out.println("Camion " + id + " advanced one step in operational context.");
+        // ✅ Publicar evento TRUCK_STATE_UPDATED al topic (channel)
+        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
+        EventDTO evento = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
+        eventPublisher.publicarEventoOperacion(evento);
         return true;
     }
 
@@ -247,6 +266,14 @@ public class OperationService {
         }
         camion.recargarCombustible(); 
         System.out.println("Camion " + id + " refueled in operational context.");
+        // 🟢 1. Enviar TRUCK_STATE_UPDATED (envía el id y el estado del camión)
+        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
+        EventDTO eventoEstado = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
+        eventPublisher.publicarEventoOperacion(eventoEstado);
+        // 🟢 2. Evento de acción completada
+        TruckActionEventDTO action = new TruckActionEventDTO(id, "REFUEL");
+        EventDTO eventoAccion = EventDTO.of(EventType.ACTION_COMPLETED, action);
+        eventPublisher.publicarEventoOperacion(eventoAccion);
         return true;
     }
 
