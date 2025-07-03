@@ -13,10 +13,11 @@ import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
-import pe.pucp.plg.util.MapperUtil;
-import pe.pucp.plg.util.ParseadorArchivos;
+import pe.pucp.plg.util.ResourceLoader;
 
-import java.nio.charset.StandardCharsets;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.awt.Point;
@@ -26,8 +27,6 @@ public class SimulacionService {
 
     private final SimulationManagerService simulationManagerService;
     private final ACOPlanner acoPlanner;
-    private final ArchivoService archivoService;
-    private final EventPublisherService eventPublisher;
 
     private static class Node {
         Point position;
@@ -51,12 +50,9 @@ public class SimulacionService {
     }
 
     @Autowired
-    public SimulacionService(SimulationManagerService simulationManagerService,
-                             ArchivoService archivoService, EventPublisherService eventPublisher) {
+    public SimulacionService(SimulationManagerService simulationManagerService) {
         this.simulationManagerService = simulationManagerService;
-        this.acoPlanner = new ACOPlanner(); 
-        this.archivoService = archivoService;
-        this.eventPublisher = eventPublisher;
+        this.acoPlanner = new ACOPlanner();
     }
 
     /**
@@ -96,7 +92,7 @@ public class SimulacionService {
         contexto.setCurrentTime(tiempoActual);
         boolean replanificar = (tiempoActual == 0); // Replanificar al inicio siempre
         
-        // 1. Recargar tanques (cada 24 horas)
+        // 1. Recargar tanques (cada 24 horas) y cargar nuevos pedidos y bloqueos para el siguiente día
         if (tiempoActual > 0 && tiempoActual % 1440 == 0) {
             System.out.println("⛽ Recarga diaria de tanques en t+" + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
@@ -104,6 +100,50 @@ public class SimulacionService {
                 TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
                 EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
                 eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
+            }
+            
+            // Determinar qué día estamos y cargar datos para ese día
+            int diaActual = tiempoActual / 1440 + 1; // +1 porque el día 1 empieza en tiempo 0
+            
+            // Solo cargamos datos nuevos si estamos dentro del período de simulación
+            if (diaActual <= contexto.getDuracionDias()) {
+                // Calcular la fecha para este día
+                LocalDate fechaActual = contexto.getFechaInicio().plusDays(diaActual - 1);
+                System.out.println("📅 Cargando datos para el día: " + fechaActual);
+                
+                // Cargar pedidos y bloqueos para este día
+                List<Pedido> nuevoPedidos = ResourceLoader.cargarPedidosParaFecha(fechaActual);
+                List<Bloqueo> nuevoBloqueos = ResourceLoader.cargarBloqueosParaFecha(fechaActual);
+                
+                // Ajustar los tiempos de los pedidos para que empiecen en el minuto correcto del día actual
+                for (Pedido p : nuevoPedidos) {
+                    // El tiempo de creación ya está en minutos relativos al día
+                    // Lo ajustamos sumando los minutos totales hasta el inicio del día actual
+                    p.setTiempoCreacion(p.getTiempoCreacion() - ((diaActual - 1) * 1440) % (24*60) + tiempoActual);
+                    p.setTiempoLimite(p.getTiempoLimite() - ((diaActual - 1) * 1440) % (24*60) + tiempoActual);
+                }
+                
+                // Ajustar los tiempos de los bloqueos para que empiecen en el minuto correcto
+                for (Bloqueo b : nuevoBloqueos) {
+                    b.setStartMin(b.getStartMin() - ((diaActual - 1) * 1440) % (24*60) + tiempoActual);
+                    b.setEndMin(b.getEndMin() - ((diaActual - 1) * 1440) % (24*60) + tiempoActual);
+                }
+                
+                // Añadir los nuevos pedidos al mapa de pedidos por tiempo
+                for (Pedido p : nuevoPedidos) {
+                    contexto.getPedidosPorTiempo().computeIfAbsent(p.getTiempoCreacion(), k -> new ArrayList<>()).add(p);
+                }
+                
+                // Añadir los nuevos bloqueos
+                contexto.getBloqueos().addAll(nuevoBloqueos);
+                
+                System.out.printf("🔄 Día %d: Cargados %d nuevos pedidos y %d bloqueos%n", 
+                        diaActual, nuevoPedidos.size(), nuevoBloqueos.size());
+                
+                // Si hay nuevos datos, replanificar
+                if (!nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty()) {
+                    replanificar = true;
+                }
             }
         }
         
@@ -150,7 +190,7 @@ public class SimulacionService {
         List<Pedido> pedidosAInyectar = new ArrayList<>();
         for (Pedido p : nuevos) {
             double volumenRestante = p.getVolumen();
-
+            
             if (volumenRestante > capacidadMaxCamion) {
                 // 🛠️ Dividir en sub-pedidos de ≤ capacidadMaxCamion
                 while (volumenRestante > 0) {
@@ -200,7 +240,7 @@ public class SimulacionService {
         }
         
         // 7. Procesar averías por turno
-        replanificar |= procesarAverias(contexto, tiempoActual);    
+        replanificar |= procesarAverias(contexto, tiempoActual);
         
         // 8. Preparar el ACO
         List<CamionEstado> flotaEstado = contexto.getCamiones().stream()
@@ -425,13 +465,13 @@ public class SimulacionService {
     }
 
     /**
-     * Initiates a new simulation based on input files specified in the request.
-     * @param request The request containing file IDs and simulation name.
+     * Initiates a new simulation based on date range specified in the request.
+     * @param request The request containing fecha inicio, duracion, and simulation name.
      * @return A DTO with the status and ID of the new simulation.
      */
     public SimulationStatusDTO iniciarSimulacion(SimulationRequest request) {
         try {
-            // 1. Crear el contexto. Esta parte está bien.
+            // 1. Crear el contexto
             String simulationId = simulationManagerService.crearContextoSimulacion();
             EventDTO eventoInicio = EventDTO.of(EventType.SIMULATION_STARTED, null); // No payload necesario o poner info básica
             eventPublisher.publicarEventoSimulacion(simulationId, eventoInicio);
@@ -441,44 +481,39 @@ public class SimulacionService {
             if (currentSimContext == null) {
                 throw new RuntimeException("No se pudo crear el contexto de simulación.");
             }
-    
-            // 2. C-FIX: Procesar cada archivo SOLO SI su ID fue proporcionado.
-    
-            // Pedidos (Asumimos que es obligatorio)
-            String fileIdPedidos = request.getFileIdPedidos();
-            if (fileIdPedidos == null || fileIdPedidos.isBlank()) {
-                throw new IllegalArgumentException("El archivo de pedidos es obligatorio.");
-            }
-            String contenidoPedidos = new String(archivoService.obtenerArchivo(fileIdPedidos), StandardCharsets.UTF_8);
-            Map<Integer, List<Pedido>> pedidosPorTiempo = ParseadorArchivos.parsearPedidosPorTiempo(contenidoPedidos);
-            currentSimContext.setPedidosPorTiempo(pedidosPorTiempo);
-            List<Pedido> initialPedidosFromFile = pedidosPorTiempo.getOrDefault(0, new ArrayList<>());
-            currentSimContext.setPedidos(new ArrayList<>(initialPedidosFromFile));
-            if (currentSimContext.getPedidosPorTiempo().containsKey(0)) {
-                 currentSimContext.getPedidosPorTiempo().remove(0); 
-            }
-    
-            // Bloqueos (Opcional)
-            String fileIdBloqueos = request.getFileIdBloqueos();
-            if (fileIdBloqueos != null && !fileIdBloqueos.isBlank()) {
-                String contenidoBloqueos = new String(archivoService.obtenerArchivo(fileIdBloqueos), StandardCharsets.UTF_8);
-                List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqueos);
-                currentSimContext.setBloqueos(bloqueos);
-            }
-    
-            // Averías (Opcional)
-            String fileIdAverias = request.getFileIdAverias();
-            if (fileIdAverias != null && !fileIdAverias.isBlank()) {
-                String contenidoAverias = new String(archivoService.obtenerArchivo(fileIdAverias), StandardCharsets.UTF_8);
-                Map<String, Map<String, String>> averiasPorTurno = ParseadorArchivos.parsearAverias(contenidoAverias);
-                currentSimContext.setAveriasPorTurno(averiasPorTurno);
-            }
-    
-            // Mantenimientos (Opcional, si lo tienes)
-            // String fileIdMantenimientos = request.getFileIdMantenimientos();
-            // if (fileIdMantenimientos != null && !fileIdMantenimientos.isBlank()) { ... }
             
-            // 3. Limpiar estados y preparar la respuesta DTO. Esta parte está bien.
+            // 2. Validar la fecha de inicio
+            if (request.getFechaInicio() == null || request.getFechaInicio().isBlank()) {
+                throw new IllegalArgumentException("La fecha de inicio es obligatoria.");
+            }
+            
+            // 3. Convertir la fecha de inicio a LocalDate
+            LocalDate fechaInicio = LocalDate.parse(request.getFechaInicio(), DateTimeFormatter.ISO_LOCAL_DATE);
+            currentSimContext.setFechaInicio(fechaInicio); // Asumimos que este campo existe o lo crearemos después
+            currentSimContext.setDuracionDias(request.getDuracionDias()); // Asumimos que este campo existe
+            
+            // 4. Cargar pedidos y bloqueos para el primer día
+            List<Pedido> pedidosDiaUno = ResourceLoader.cargarPedidosParaFecha(fechaInicio);
+            List<Bloqueo> bloqueosDiaUno = ResourceLoader.cargarBloqueosParaFecha(fechaInicio);
+            
+            // 5. Organizar los pedidos por tiempo
+            Map<Integer, List<Pedido>> pedidosPorTiempo = new HashMap<>();
+            for (Pedido p : pedidosDiaUno) {
+                pedidosPorTiempo.computeIfAbsent(p.getTiempoCreacion(), k -> new ArrayList<>()).add(p);
+            }
+            currentSimContext.setPedidosPorTiempo(pedidosPorTiempo);
+            
+            // 6. Añadir los pedidos iniciales (tiempo 0) a la lista activa
+            List<Pedido> initialPedidos = pedidosPorTiempo.getOrDefault(0, new ArrayList<>());
+            currentSimContext.setPedidos(new ArrayList<>(initialPedidos));
+            if (currentSimContext.getPedidosPorTiempo().containsKey(0)) {
+                currentSimContext.getPedidosPorTiempo().remove(0);
+            }
+            
+            // 7. Establecer los bloqueos iniciales
+            currentSimContext.setBloqueos(bloqueosDiaUno);
+            
+            // 8. Inicializar las estructuras de datos necesarias
             currentSimContext.getEventosEntrega().clear();
             currentSimContext.getAveriasAplicadas().clear();
             currentSimContext.getCamionesInhabilitados().clear();
@@ -549,6 +584,8 @@ public class SimulacionService {
                     condCapacidad
             );
 
+            List<Point> path;
+
             if (camion.getStatus() == CamionEstado.TruckStatus.DELIVERING
                     && esDesvioValido(camion, nuevo, tiempoActual, contexto)
                     && camion.getCapacidadDisponible() >= nuevo.getVolumen()) {
@@ -560,7 +597,7 @@ public class SimulacionService {
                         tiempoActual, nuevo.getId(), camion.getPlantilla().getId(), idx);
 
                 int cx = camion.getX(), cy = camion.getY();
-                List<Point> path = buildManhattanPath(cx, cy, nuevo.getX(), nuevo.getY(), tiempoActual, contexto);
+                path = buildManhattanPath(cx, cy, nuevo.getX(), nuevo.getY(), tiempoActual, contexto);
                 int pasos = path.size();
                 //int dist = Math.abs(cx - nuevo.getX()) + Math.abs(cy - nuevo.getY());
                 int tViaje = (int) Math.ceil(pasos * (60.0 / 50.0));
@@ -589,7 +626,7 @@ public class SimulacionService {
                     System.out.printf("⏱️ t+%d: Asignando Pedido #%d al Camión %s%n (%d,%d)",
                             tiempoActual, p.getId(), camion.getPlantilla().getId(), p.getX(), p.getY());
 
-                    List<Point> path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual, contexto);
+                    path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual, contexto);
                     int dist = path.size();
                     int tViaje = (int) Math.ceil(dist * (60.0 / 50.0));
 
