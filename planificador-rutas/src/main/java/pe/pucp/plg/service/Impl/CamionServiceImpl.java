@@ -75,6 +75,12 @@ public class CamionServiceImpl implements CamionService {
         camion.setX(p.x);
         camion.setY(p.y);
         camion.getHistory().add(new Point(p.x, p.y));
+        // —> Evitar teletransportes si pasoActual superó rutaActual
+        if (camion.getPasoActual() >= camion.getRutaActual().size()) {
+            camion.getRutaActual().clear();
+            camion.setPasoActual(0);
+            //camion.getRutaPendiente().clear();
+        }
     }
 
     /**

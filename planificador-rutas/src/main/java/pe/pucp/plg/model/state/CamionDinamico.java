@@ -10,7 +10,7 @@ import java.util.List;
 
 public class CamionDinamico {
     public enum TruckStatus {
-        AVAILABLE, DELIVERING, RETURNING
+        AVAILABLE, DELIVERING, RETURNING ,UNAVAILABLE
     }
 
     // === Referencia a la plantilla ===
@@ -35,6 +35,9 @@ public class CamionDinamico {
     private List<Point> rutaActual = Collections.emptyList();
     private int pasoActual = 0;
     private final List<Point> history = new ArrayList<>();
+    private List<Point> rutaBackup;
+    private List<Pedido> pedidosBackup;
+    private Pedido pedidoDesvio;
 
     // --- Estadísticas de consumo ---
     private double consumoAcumulado = 0.0;
@@ -110,4 +113,20 @@ public class CamionDinamico {
     public void setRetDestX(int retDestX) { this.retDestX = retDestX; }
     public int getRetDestY() { return retDestY; }
     public void setRetDestY(int retDestY) { this.retDestY = retDestY; }
+    // Setters y getters renombrados
+    public void setRutaBackup(List<Point> r)     { this.rutaBackup = r; }
+    public List<Point> getRutaBackup()            { return rutaBackup;    }
+
+    public void setPedidosBackup(List<Pedido> p)  { this.pedidosBackup = p; }
+    public List<Pedido> getPedidosBackup()        { return pedidosBackup; }
+
+    public void setPedidoDesvio(Pedido d)         { this.pedidoDesvio = d; }
+    public Pedido getPedidoDesvio()               { return pedidoDesvio;  }
+
+    // Limpia los backups
+    public void clearDesvio() {
+        this.rutaBackup     = null;
+        this.pedidosBackup  = null;
+        this.pedidoDesvio   = null;
+    }
 }
