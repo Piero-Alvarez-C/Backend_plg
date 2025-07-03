@@ -19,6 +19,9 @@ import pe.pucp.plg.dto.TanqueDTO; // Added
 import pe.pucp.plg.dto.AveriaDTO;
 import pe.pucp.plg.util.MapperUtil;
 
+
+import java.util.Map;
+
 @Service
 public class OperationService {
 
@@ -84,6 +87,7 @@ public class OperationService {
         operationalContext.getAveriasPorTurno()
                 .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
 
+    
         // Mark the truck as unavailable if the breakdown is for the current/active turn
         // This logic might be more complex depending on how turns are managed vs.
         // currentTime
@@ -96,9 +100,9 @@ public class OperationService {
                 .filter(c -> c.getPlantilla().getId().equals(camionId))
                 .findFirst()
                 .ifPresent(camion -> {
-                    // camion.setStatus(CamionEstado.TruckStatus.OUT_OF_SERVICE); // Or a similar
-                    // status
-                    // Potentially clear its current route, etc.
+                    System.out.println("Estado antes: " + camion.getStatus());
+                    camion.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
+                    System.out.println("Estado después: " + camion.getStatus());
                     System.out.println(
                             "Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
                 });

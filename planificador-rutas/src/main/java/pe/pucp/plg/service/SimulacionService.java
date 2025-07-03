@@ -2,8 +2,11 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import pe.pucp.plg.dto.AveriaDTO;
 import pe.pucp.plg.dto.SimulationRequest;
 import pe.pucp.plg.dto.SimulationStatusDTO;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.EntregaEvent;
 import pe.pucp.plg.model.common.Pedido;
@@ -353,7 +356,7 @@ public class SimulacionService {
         
         // Aplicar averías programadas para este turno
         Map<String, String> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
-
+   
         for (Map.Entry<String, String> entry : averiasTurno.entrySet()) {
             String key = turnoActual + "_" + entry.getKey();
             if (contexto.getAveriasAplicadas().contains(key)) continue;
@@ -366,6 +369,7 @@ public class SimulacionService {
                 String tipoaveria = entry.getValue();
                 int penal=calcularTiempoAveria(turnoActual,tipoaveria,tiempoActual);           
                 c.setTiempoLibre(tiempoActual + penal);
+                c.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
                 contexto.getAveriasAplicadas().add(key);
                 contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
                 
@@ -382,6 +386,7 @@ public class SimulacionService {
             CamionEstado c = findCamion(it.next(), contexto);
             if (c != null && c.getTiempoLibre() <= tiempoActual) {
                 it.remove();
+                c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
                 System.out.printf("🚚 Camión %s reparado y disponible nuevamente en t+%d%n", 
                                  c.getPlantilla().getId(), tiempoActual);
                 replanificar = true;
@@ -735,6 +740,21 @@ public class SimulacionService {
         }
 
         return inactividad;
+    }
+
+    public Averia registrarAveriaSimulacion(String simulationId,AveriaDTO dto) {
+        ExecutionContext operationalContext = simulationManagerService.getContextoSimulacion(simulationId);
+        if (operationalContext == null) {
+            throw new IllegalStateException("Operational context is not available.");
+        }
+        String turno= dto.getTurno();
+        String camionId= dto.getCodigoVehiculo();
+        String tipoAveria= dto.getTipoIncidente();
+        Averia nuevAveria= new Averia(turno,camionId,tipoAveria);
+        operationalContext.getAveriasPorTurno()
+                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
+        System.out.println("Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
+        return nuevAveria;
     }
 
 

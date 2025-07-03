@@ -6,7 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.service.SimulacionService;
-import pe.pucp.plg.service.SimulationManagerService; 
+import pe.pucp.plg.service.SimulationManagerService;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.context.ExecutionContext; 
 import pe.pucp.plg.util.MapperUtil;
 
@@ -111,4 +112,15 @@ public class SimulacionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
+    @PostMapping("/{simulationId}/averia")
+    public ResponseEntity<AveriaDTO> aplicarAveriaSim(@PathVariable String simulationId,@RequestBody AveriaDTO dto) {
+        Averia nuevaAveria = simulacionService.registrarAveriaSimulacion(simulationId, dto);
+        if (nuevaAveria == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(MapperUtil.toAveriaDTO(nuevaAveria));
+    }
+
+    
 }
