@@ -2,8 +2,8 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pe.pucp.plg.dto.SimulationRequest;
-import pe.pucp.plg.dto.SimulationStatusDTO;
+import pe.pucp.plg.dto.*;
+import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.EntregaEvent;
 import pe.pucp.plg.model.common.Pedido;
@@ -13,6 +13,7 @@ import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
+import pe.pucp.plg.util.MapperUtil;
 import pe.pucp.plg.util.ParseadorArchivos;
 
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ public class SimulacionService {
     private final SimulationManagerService simulationManagerService;
     private final ACOPlanner acoPlanner;
     private final ArchivoService archivoService;
+    private final EventPublisherService eventPublisher;
 
     private static class Node {
         Point position;
@@ -50,10 +52,11 @@ public class SimulacionService {
 
     @Autowired
     public SimulacionService(SimulationManagerService simulationManagerService,
-                             ArchivoService archivoService) {
+                             ArchivoService archivoService, EventPublisherService eventPublisher) {
         this.simulationManagerService = simulationManagerService;
         this.acoPlanner = new ACOPlanner(); 
         this.archivoService = archivoService;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -98,14 +101,17 @@ public class SimulacionService {
             System.out.println("⛽ Recarga diaria de tanques en t+" + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
+                TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
+                EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
             }
         }
         
-        // 2 Procesar eventos de entrega programados
-        procesarEventosEntrega(contexto, tiempoActual);
+        // 2 Procesar eventrocesarEventosEntrega(contexto, tiempoActual, simulationos de entrega programados
+        procesarEventosEntrega(contexto, tiempoActual, simulationId);
 
         // 3. Iniciar retorno de camiones
-        procesarRetorno(contexto, tiempoActual);
+        procesarRetorno(contexto, tiempoActual,simulationId);
 
         // 4. Avanzar cada camión en sus rutas actuales
         for (CamionEstado c : contexto.getCamiones()) {
@@ -122,6 +128,10 @@ public class SimulacionService {
                 
                 System.out.printf("🚚 Camión %s ha completado su retorno y está disponible en t+%d%n", 
                                  c.getPlantilla().getId(), tiempoActual + 15);
+                // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
+                CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
+                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
         
@@ -176,6 +186,11 @@ public class SimulacionService {
         while (itP.hasNext()) {
             Pedido p = itP.next();
             if (!p.isAtendido() && !p.isDescartado() && tiempoActual > p.getTiempoLimite()) {
+                // Emitir evento SIMULATION_COLLAPSED con pedido afectado
+                PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
+                EventDTO eventoColapso = EventDTO.of(EventType.SIMULATION_COLLAPSED, pedidoDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoColapso);
+
                 System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
                         tiempoActual, p.getId());
                 // Marca y elimina para no repetir el colapso
@@ -237,7 +252,7 @@ public class SimulacionService {
             List<Ruta> nuevasRutas = acoPlanner.planificarRutas(candidatos, flotaEstado, tiempoActual, contexto);
             
             // 4.2 Traducir el plan a acciones concretas sobre el estado real
-            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto);
+            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto,simulationId);
             
             // 4.3 Guardar las rutas en el contexto para visualización o análisis
             contexto.setRutas(nuevasRutas);
@@ -251,7 +266,7 @@ public class SimulacionService {
      * @param contexto El contexto de ejecución
      * @param tiempoActual El tiempo actual de la simulación
      */
-    private void procesarEventosEntrega(ExecutionContext contexto, int tiempoActual) {
+    private void procesarEventosEntrega(ExecutionContext contexto, int tiempoActual, String simulationId) {
         Iterator<EntregaEvent> itEv = contexto.getEventosEntrega().iterator();
         while (itEv.hasNext()) {
             EntregaEvent ev = itEv.next();
@@ -275,7 +290,11 @@ public class SimulacionService {
                     
                     System.out.printf("✅ Entrega realizada - Pedido %d por camión %s en t+%d%n", 
                                      ev.getPedido().getId(), camion.getPlantilla().getId(), tiempoActual);
-                    
+
+                    // Emitir evento ORDER_STATE_UPDATED a través de EventPublisherService
+                    PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(ev.getPedido());
+                    EventDTO evento2 = EventDTO.of(EventType.ORDER_STATE_UPDATED, pedidoDTO);
+                    eventPublisher.publicarEventoSimulacion(simulationId, evento2); // Método para topic dinámico /topic/simulation/{id}
                     // Eliminar el evento procesado
                     itEv.remove();
                 }
@@ -289,7 +308,7 @@ public class SimulacionService {
      * @param tiempoActual El tiempo actual de la simulación
      * @return true si se requiere replanificación
      */
-    private void procesarRetorno(ExecutionContext contexto, int tiempoActual) {
+    private void procesarRetorno(ExecutionContext contexto, int tiempoActual, String simulationId) {
         Iterator<CamionEstado> it = contexto.getCamiones().iterator();
         while (it.hasNext()) {
             CamionEstado camion = it.next();
@@ -326,6 +345,10 @@ public class SimulacionService {
                 camion.setRuta(returnPath);
                 camion.setPasoActual(0);
                 camion.getHistory().addAll(returnPath);
+                // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
+                CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
+                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
     }
@@ -410,6 +433,9 @@ public class SimulacionService {
         try {
             // 1. Crear el contexto. Esta parte está bien.
             String simulationId = simulationManagerService.crearContextoSimulacion();
+            EventDTO eventoInicio = EventDTO.of(EventType.SIMULATION_STARTED, null); // No payload necesario o poner info básica
+            eventPublisher.publicarEventoSimulacion(simulationId, eventoInicio);
+
             ExecutionContext currentSimContext = simulationManagerService.getContextoSimulacion(simulationId);
     
             if (currentSimContext == null) {
@@ -476,7 +502,7 @@ public class SimulacionService {
 
     // --- Métodos auxiliares privados ---
 
-    private void aplicarRutas(int tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto) {
+    private void aplicarRutas(int tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto, String simulationId) {
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
 
         // A) Filtrar rutas que no caben en la flota real
@@ -502,6 +528,11 @@ public class SimulacionService {
 
         // B) Aplicar cada ruta al estado real
         for (Ruta ruta : rutas) {
+            // Emitir evento ROUTE_ASSIGNED para cada ruta asignada
+            RutaDTO rutaDTO = MapperUtil.toRutaDTO(ruta);
+            EventDTO eventoRuta = EventDTO.of(EventType.ROUTE_ASSIGNED,rutaDTO);
+            eventPublisher.publicarEventoSimulacion(simulationId, eventoRuta);
+
             CamionEstado camion = findCamion(ruta.getCamionId(), contexto);
             Pedido nuevo = activos.get(ruta.getPedidoIds().get(0));
 
