@@ -42,6 +42,9 @@ public class Pedido {
     public void setDescartado(boolean descartado) {
         this.descartado = descartado;
     }
+    public void setTiempoLimite(int tiempoLimite) {
+        this.tiempoLimite = tiempoLimite;
+    }
     // → marcar como atendido:
     public void setProgramado(boolean programado) {this.programado = programado; }
     public void setAtendido(boolean a) { this.atendido = a; }
