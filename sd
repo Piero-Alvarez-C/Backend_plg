@@ -1,0 +1,131 @@
+[33mcommit 67233c0f13a637364e21e0f0346359b4a7ae01b8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Thu Jul 3 15:04:37 2025 -0500
+
+    cambios aplicados - desvios optimos
+
+[33mcommit 08db8451950bb4838dc84f1f7337dcb983a4865a[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Sxrg1o <sese.gusu@gmail.com>
+Date:   Thu Jun 12 12:10:17 2025 -0500
+
+    Deploy
+
+[33mcommit e0c1e400b55122dc28100ae775e61d2216fce48a[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Thu Jun 12 05:25:04 2025 -0500
+
+    actualizado 12-06-2025 - fernando
+
+[33mcommit 2c67fcd7c36af8d8034a1223e70c79dd4a56948e[m
+Author: Sxrg1o <sese.gusu@gmail.com>
+Date:   Wed Jun 11 22:47:59 2025 -0500
+
+    Build
+
+[33mcommit e772586af01d8afb7f8a6eeca8810d1578acfccd[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Wed Jun 11 19:10:44 2025 -0500
+
+    Actualización camionController
+
+[33mcommit 3b8d064c6ae2b6c4c0b9b199a726d07200c3c0ef[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Wed Jun 11 18:45:54 2025 -0500
+
+    actualizado 11-06-2025 fernando
+
+[33mcommit 1a5cdbfdecf4000a5a90ee4e5164019b422ac609[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Wed Jun 11 16:14:20 2025 -0500
+
+    Estructura de paquetes corregida
+
+[33mcommit d912b3606b97706db74447837b09d8beb16e3fd3[m
+Merge: 40c6f53 b78fcca
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Tue Jun 10 00:27:25 2025 -0500
+
+    Merge pull request #2 from Piero-Alvarez-C/fernando-branch
+    
+    Corrección para evitar bloques visualmente
+
+[33mcommit b78fcca3dce62ef3511f643b5eb2cb5200dc393b[m[33m ([m[1;31morigin/fernando-branch[m[33m, [m[1;32mfernando-branch[m[33m)[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Mon Jun 9 21:55:23 2025 -0500
+
+    actualizado x2 09-06-2025
+
+[33mcommit c5985cfb4155d972e31a3849c97a04856df14009[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Mon Jun 9 21:47:23 2025 -0500
+
+    actualizado 09-06-2025
+
+[33mcommit dee29ca753371f3c0d193ced18f3feb7d2cebcb3[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Sun Jun 8 22:45:19 2025 -0500
+
+    actualizado 08-06-2025 fernando
+
+[33mcommit 40c6f535b13b90e9d7753088ac0a719354a87730[m
+Merge: 09657b8 e93cecb
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Wed Jun 4 23:48:41 2025 -0500
+
+    Merge pull request #1 from Piero-Alvarez-C/fernando-branch
+    
+    fernando-branch
+
+[33mcommit e93cecb250306fba0c9bfc4c9e121d00753d5550[m
+Author: Fernando <a20190418@pucp.edu.pe>
+Date:   Wed Jun 4 22:11:35 2025 -0500
+
+    fernando-branch
+
+[33mcommit 09657b81c89b226d96ebd98e5c59a0a642da41a4[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 21:10:18 2025 -0500
+
+    CorsConfig
+
+[33mcommit f7aa3bba4bf97c2d55a7e400ebf4a50bb882a86c[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 18:46:02 2025 -0500
+
+    arreglo pedidos
+
+[33mcommit e94f8c1d620f64ac4653c2cbf998215e507b5e06[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 17:29:43 2025 -0500
+
+    tipos de tanques
+
+[33mcommit 19b13c00d5122ba67f858c44eea2c937717596d2[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 17:26:44 2025 -0500
+
+    endpoint tanques
+
+[33mcommit 800df89474ca49ea37140ae19e6c2da00441a529[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 14:57:40 2025 -0500
+
+    correccion en BD
+
+[33mcommit e9667b6fb62843754c45ec15db69f3d1a3f07ffd[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 14:46:15 2025 -0500
+
+    arreglo commit
+
+[33mcommit 0f3634904d776a3d3d7ac9e537995c9258fb559d[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 14:42:11 2025 -0500
+
+    primer commit
+
+[33mcommit cb8ef6ac2d8a84eb68032df72d648f245c288a6a[m
+Author: Piero Alonso Alvarez Castillo <167045705+Piero-Alvarez-C@users.noreply.github.com>
+Date:   Thu May 29 14:39:51 2025 -0500
+
+    first commit
