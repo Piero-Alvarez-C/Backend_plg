@@ -7,6 +7,7 @@ import pe.pucp.plg.model.common.Ruta;
 import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -55,7 +56,13 @@ public class ExecutionContext {
     // 13) Turno anterior (para detectar cambio de turno)
     private String turnoAnterior = "";
 
-    /** 14) Últimas rutas calculadas (para exponerlas en el snapshot) */
+    // 14) Fecha de inicio de la simulación
+    private LocalDate fechaInicio;
+
+    // 15) Duración de la simulación en días
+    private int duracionDias;
+
+    /** 16) Últimas rutas calculadas (para exponerlas en el snapshot) */
     private List<Ruta> rutas = new ArrayList<>();
 
     // ————— GETTERS y SETTERS (tal como los tienes) —————
@@ -104,6 +111,12 @@ public class ExecutionContext {
 
     public List<Ruta> getRutas() { return rutas; }
     public void setRutas(List<Ruta> rutas) { this.rutas = rutas; }
+    
+    public LocalDate getFechaInicio() { return fechaInicio; }
+    public void setFechaInicio(LocalDate fechaInicio) { this.fechaInicio = fechaInicio; }
+    
+    public int getDuracionDias() { return duracionDias; }
+    public void setDuracionDias(int duracionDias) { this.duracionDias = duracionDias; }
 
     public TanqueDinamico obtenerTanquePorPosicion(int x, int y) {
         return tanques.stream()

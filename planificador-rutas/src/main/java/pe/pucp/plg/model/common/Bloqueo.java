@@ -8,8 +8,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Bloqueo {
-    private final int startMin;      // minuto absoluto de inicio
-    private final int endMin;        // minuto absoluto de fin (exclusivo)
+    private int startMin;      // minuto absoluto de inicio
+    private int endMin;        // minuto absoluto de fin (exclusivo)
     private final List<Point> nodes; // nodos extremos del bloqueo (poligonal abierta)
     private String description;
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
@@ -104,5 +104,11 @@ public class Bloqueo {
     }
     public String getDescription() {
         return description;
+    }
+    public void setStartMin(int startMin) {
+        this.startMin = startMin;
+    }
+    public void setEndMin(int endMin) {
+        this.endMin = endMin;
     }
 }
