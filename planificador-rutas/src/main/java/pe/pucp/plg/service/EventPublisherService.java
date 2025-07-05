@@ -19,14 +19,14 @@ public class EventPublisherService {
      * Publica un evento al topic global de operaciones (/topic/operations)
      */
     public void publicarEventoOperacion(EventDTO evento) {
-        messagingTemplate.convertAndSend("/topic/operations", evento);
+        String topic = "/topic/operations";
+        messagingTemplate.convertAndSend(topic, evento);
+        System.out.println("Publicado evento en " + topic + ": " + evento);
     }
 
-    /**
-     * Publica un evento al topic de una simulación específica (/topic/simulation/{id})
-     */
     public void publicarEventoSimulacion(String simulationId, EventDTO evento) {
         String destino = "/topic/simulation/" + simulationId;
         messagingTemplate.convertAndSend(destino, evento);
+        System.out.println("Publicado evento en " + destino + ": " + evento);
     }
 }
