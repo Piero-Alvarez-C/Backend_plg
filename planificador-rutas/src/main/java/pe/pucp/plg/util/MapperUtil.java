@@ -52,9 +52,9 @@ public class MapperUtil {
 
     public static BloqueoDTO toBloqueoDTO(Bloqueo bloqueo) {
         BloqueoDTO dto = new BloqueoDTO();
-        dto.setId("B-" + bloqueo.getStartMin() + "-" + bloqueo.getEndMin());
-        dto.setTiempoInicio(bloqueo.getStartMin());
-        dto.setTiempoFin(bloqueo.getEndMin());
+        dto.setId("B-" + bloqueo.getStartTime() + "-" + bloqueo.getEndTime());
+        dto.setTiempoInicio(bloqueo.getStartTime());
+        dto.setTiempoFin(bloqueo.getEndTime());
         dto.setDescription(bloqueo.getDescription());
         List<PointDTO> nodesDto = bloqueo.getNodes().stream()
                 .map(MapperUtil::toPointDTO)

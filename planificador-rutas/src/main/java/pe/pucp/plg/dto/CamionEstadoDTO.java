@@ -1,11 +1,13 @@
 package pe.pucp.plg.dto;
 
+import java.time.LocalDateTime;
+
 public class CamionEstadoDTO {
     private String id;
     private int posX;
     private int posY;
     private double capacidadDisponible;
-    private int tiempoLibre;
+    private LocalDateTime tiempoLibre;
     private double tara;
     private double combustibleDisponible;
 
@@ -25,8 +27,8 @@ public class CamionEstadoDTO {
         this.capacidadDisponible = capacidadDisponible;
     }
 
-    public int getTiempoLibre() { return tiempoLibre; }
-    public void setTiempoLibre(int tiempoLibre) { this.tiempoLibre = tiempoLibre; }
+    public LocalDateTime getTiempoLibre() { return tiempoLibre; }
+    public void setTiempoLibre(LocalDateTime tiempoLibre) { this.tiempoLibre = tiempoLibre; }
 
     public double getTara() { return tara; }
     public void setTara(double tara) { this.tara = tara; }

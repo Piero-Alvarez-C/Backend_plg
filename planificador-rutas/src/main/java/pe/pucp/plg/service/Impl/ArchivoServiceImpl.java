@@ -10,6 +10,8 @@ import pe.pucp.plg.service.ArchivoService;
 import pe.pucp.plg.service.PlanificadorService;
 import pe.pucp.plg.util.ParseadorArchivos;
 
+import java.time.LocalDate;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +33,11 @@ public class ArchivoServiceImpl implements ArchivoService {
     public void procesarArchivo(MultipartFile archivo, ArchivoTipo tipo) {
         try {
             String contenido = new String(archivo.getBytes());
+            LocalDate fechaPrimerDiaDelMes = LocalDate.of(2025, 1, 1); // Default to January 2025
 
             switch (tipo) {
                 case PEDIDOS -> {
-                    List<Pedido> pedidos = ParseadorArchivos.parsearPedidos(contenido);
+                    List<Pedido> pedidos = ParseadorArchivos.parsearPedidos(contenido, fechaPrimerDiaDelMes);
                     planificadorService.setPedidos(pedidos);
                 }
                 case MANTENIMIENTOS -> {
@@ -42,7 +45,7 @@ public class ArchivoServiceImpl implements ArchivoService {
                     planificadorService.setMantenimientos(mantenimientos);
                 }
                 case BLOQUEOS -> {
-                    List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenido);
+                    List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenido, fechaPrimerDiaDelMes);
                     planificadorService.setBloqueos(bloqueos);
                 }
                 default -> throw new IllegalArgumentException("Tipo de archivo no soportado");

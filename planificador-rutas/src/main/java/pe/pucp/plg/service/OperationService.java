@@ -7,6 +7,8 @@ import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 
+import java.time.LocalDateTime;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors; // Added
@@ -43,9 +45,9 @@ public class OperationService {
             nuevoPedido.setId(operationalContext.generateUniquePedidoId());
         }
 
-        if (nuevoPedido.getTiempoCreacion() == operationalContext.getCurrentTime()) {
+        if (nuevoPedido.getTiempoCreacion().equals(operationalContext.getCurrentTime())) {
             operationalContext.getPedidos().add(nuevoPedido);
-        } else if (nuevoPedido.getTiempoCreacion() > operationalContext.getCurrentTime()) {
+        } else if (nuevoPedido.getTiempoCreacion().isAfter(operationalContext.getCurrentTime())) {
             operationalContext.getPedidosPorTiempo()
                 .computeIfAbsent(nuevoPedido.getTiempoCreacion(), k -> new ArrayList<>()).add(nuevoPedido);
         } else {
@@ -100,7 +102,7 @@ public class OperationService {
             throw new IllegalStateException("Operational context is not available.");
         }
 
-        int nuevoTiempo = operationalContext.getCurrentTime() + 1;
+        LocalDateTime nuevoTiempo = operationalContext.getCurrentTime().plusMinutes(1);
         operationalContext.setCurrentTime(nuevoTiempo);
 
         // Activate new pedidos for the current time

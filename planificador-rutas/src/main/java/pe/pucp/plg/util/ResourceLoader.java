@@ -13,7 +13,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Utilidad para cargar recursos desde el classpath según la fecha.
@@ -24,7 +23,7 @@ public class ResourceLoader {
      * Carga los pedidos correspondientes a una fecha específica.
      * 
      * @param fecha La fecha para la cual cargar los pedidos
-     * @return Lista de pedidos filtrados para el día exacto de la fecha
+     * @return Lista de pedidos para la fecha especificada
      */
     public static List<Pedido> cargarPedidosParaFecha(LocalDate fecha) {
         try {
@@ -32,23 +31,25 @@ public class ResourceLoader {
             String anioMes = fecha.format(DateTimeFormatter.ofPattern("yyMM"));
             
             // Construir el nombre del archivo
-            String nombreArchivo = "pedidos/ventas" + anioMes + ".txt";
+            String nombreArchivo = "pedidos/ventas20" + anioMes + ".txt";
             
             // Cargar el contenido desde resources
             String contenido = leerContenidoArchivo(nombreArchivo);
             
-            // Parsear todos los pedidos del archivo
-            List<Pedido> todosLosPedidos = ParseadorArchivos.parsearPedidos(contenido);
+            // Calcular el primer día del mes para convertir a LocalDateTime absoluto
+            LocalDate primerDiaDelMes = fecha.withDayOfMonth(1);
             
-            // Calcular minutos desde inicio de mes para el día específico
-            int diaDelMes = fecha.getDayOfMonth();
-            int minutosInicioDia = (diaDelMes - 1) * 1440; // 1440 minutos por día
-            int minutosFinDia = diaDelMes * 1440;
+            // Parsear todos los pedidos del archivo con fechas absolutas
+            List<Pedido> todosLosPedidos = ParseadorArchivos.parsearPedidos(contenido, primerDiaDelMes);
             
             // Filtrar para obtener solo pedidos del día específico
+            // El filtro ahora es más simple porque trabajamos con LocalDateTime completo
+            LocalDate fechaSiguiente = fecha.plusDays(1);
+            
             return todosLosPedidos.stream()
-                .filter(p -> p.getTiempoCreacion() >= minutosInicioDia && p.getTiempoCreacion() < minutosFinDia)
-                .collect(Collectors.toList());
+                .filter(p -> !p.getTiempoCreacion().toLocalDate().isBefore(fecha) && 
+                             p.getTiempoCreacion().toLocalDate().isBefore(fechaSiguiente))
+                .toList();
             
         } catch (IOException e) {
             System.err.println("Error cargando pedidos para fecha " + fecha + ": " + e.getMessage());
@@ -68,23 +69,25 @@ public class ResourceLoader {
             String anioMes = fecha.format(DateTimeFormatter.ofPattern("yyMM"));
             
             // Construir el nombre del archivo
-            String nombreArchivo = anioMes + ".bloqueos.txt";
+            String nombreArchivo = "bloqueos/20" + anioMes + ".bloqueos.txt";
             
             // Cargar el contenido desde resources
             String contenido = leerContenidoArchivo(nombreArchivo);
             
-            // Parsear todos los bloqueos del archivo
-            List<Bloqueo> todosLosBloqueos = ParseadorArchivos.parsearBloqueos(contenido);
+            // Calcular el primer día del mes para convertir a LocalDateTime absoluto
+            LocalDate primerDiaDelMes = fecha.withDayOfMonth(1);
             
-            // Calcular minutos desde inicio de mes para el día específico
-            int diaDelMes = fecha.getDayOfMonth();
-            int minutosInicioDia = (diaDelMes - 1) * 1440; // 1440 minutos por día
-            int minutosFinDia = diaDelMes * 1440;
+            // Parsear todos los bloqueos del archivo con fechas absolutas
+            List<Bloqueo> todosLosBloqueos = ParseadorArchivos.parsearBloqueos(contenido, primerDiaDelMes);
             
-            // Filtrar para obtener solo bloqueos activos en el día específico
+            // Filtrar para obtener solo bloqueos que tienen efecto en el día específico
+            // El filtro ahora es más simple porque trabajamos con LocalDateTime completo
+            LocalDate fechaSiguiente = fecha.plusDays(1);
+            
             return todosLosBloqueos.stream()
-                .filter(b -> (b.getStartMin() < minutosFinDia && b.getEndMin() > minutosInicioDia))
-                .collect(Collectors.toList());
+                .filter(b -> !b.getStartTime().toLocalDate().isAfter(fechaSiguiente.minusDays(1)) && 
+                             !b.getEndTime().toLocalDate().isBefore(fecha))
+                .toList();
             
         } catch (IOException e) {
             System.err.println("Error cargando bloqueos para fecha " + fecha + ": " + e.getMessage());

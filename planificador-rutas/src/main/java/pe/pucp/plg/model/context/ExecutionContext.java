@@ -8,8 +8,11 @@ import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 public class ExecutionContext {
 
@@ -32,8 +35,8 @@ public class ExecutionContext {
     // 5) Eventos de entrega futuros (se programan con tiempo de disparo)
     private List<EntregaEvent> eventosEntrega = new ArrayList<>();
 
-    // 6) Mapa: minuto → lista de pedidos que llegan ese minuto
-    private Map<Integer, List<Pedido>> pedidosPorTiempo = new HashMap<>();
+    // 6) Mapa: tiempo → lista de pedidos que llegan ese tiempo
+    private NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = new TreeMap<>();
 
     // 7) Averías por turno: ("T1"|"T2"|"T3") + camiónId → tipoAvería
     private Map<String, Map<String, String>> averiasPorTurno = new HashMap<>();
@@ -47,8 +50,8 @@ public class ExecutionContext {
     // 10) Depósito principal (coordenadas)
     private int depositoX = 12, depositoY = 8;
 
-    // 11) Tiempo actual de la simulación (en minutos)
-    private int currentTime = 0;
+    // 11) Tiempo actual de la simulación
+    private LocalDateTime currentTime;
 
     // 12) Límite de tiempo máximo para simular (opcional)
     private int maxTime = Integer.MAX_VALUE;
@@ -82,8 +85,8 @@ public class ExecutionContext {
     public List<EntregaEvent> getEventosEntrega() { return eventosEntrega; }
     public void setEventosEntrega(List<EntregaEvent> eventosEntrega) { this.eventosEntrega = eventosEntrega; }
 
-    public Map<Integer, List<Pedido>> getPedidosPorTiempo() { return pedidosPorTiempo; }
-    public void setPedidosPorTiempo(Map<Integer, List<Pedido>> pedidosPorTiempo) { this.pedidosPorTiempo = pedidosPorTiempo; }
+    public NavigableMap<LocalDateTime, List<Pedido>> getPedidosPorTiempo() { return pedidosPorTiempo; }
+    public void setPedidosPorTiempo(NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo) { this.pedidosPorTiempo = pedidosPorTiempo; }
 
     public Map<String, Map<String, String>> getAveriasPorTurno() { return averiasPorTurno; }
     public void setAveriasPorTurno(Map<String, Map<String, String>> averiasPorTurno) { this.averiasPorTurno = averiasPorTurno; }
@@ -100,8 +103,8 @@ public class ExecutionContext {
     public int getDepositoY() { return depositoY; }
     public void setDepositoY(int depositoY) { this.depositoY = depositoY; }
 
-    public int getCurrentTime() { return currentTime; }
-    public void setCurrentTime(int currentTime) { this.currentTime = currentTime; }
+    public LocalDateTime getCurrentTime() { return currentTime; }
+    public void setCurrentTime(LocalDateTime currentTime) { this.currentTime = currentTime; }
 
     public int getMaxTime() { return maxTime; }
     public void setMaxTime(int maxTime) { this.maxTime = maxTime; }
