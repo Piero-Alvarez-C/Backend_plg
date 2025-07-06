@@ -35,39 +35,6 @@ public class SimulacionController {
         return ResponseEntity.ok("Resultado: " + result);
     }
 
-    // ------------------------------------------------------------
-    // 2) Avanzar un minuto de simulación específica
-    // ------------------------------------------------------------
-    @PostMapping("/{simulationId}/step")
-    public ResponseEntity<SimulacionSnapshotDTO> step(@PathVariable String simulationId) {
-        // Step the simulation
-        LocalDateTime nuevoTiempo = simulacionService.stepOneMinute(simulationId);
-
-        // Get the updated context AFTER the step to create the snapshot
-        ExecutionContext simContext = simulationManagerService.getContextoSimulacion(simulationId);
-        if (simContext == null) {
-            // Attempt to get operational context if simulationId suggests it
-            if ("operational".equals(simulationId)) { // Or a constant for operational context ID
-                simContext = simulationManagerService.getOperationalContext();
-            }
-            if (simContext == null) {
-                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // Or a more descriptive error DTO
-            }
-        }
-        
-        // Ensure the context time matches nuevoTiempo, though simContext.getCurrentTime() should be authoritative after step
-        if(!simContext.getCurrentTime().equals(nuevoTiempo)) {
-            // Log potential inconsistency or decide which time is authoritative
-            System.err.println("Time mismatch after step: service returned " + nuevoTiempo + ", context has " + simContext.getCurrentTime());
-        }
-
-        // Map to SnapshotDTO using the current state of simContext
-        SimulacionSnapshotDTO snapshot = MapperUtil.toSnapshotDTO(simContext);
-        // Override tiempoActual in snapshot if needed, though toSnapshotDTO should use context's time
-        // snapshot.setTiempoActual(simContext.getCurrentTime()); 
-
-        return ResponseEntity.ok(snapshot);
-    }
 
     // ------------------------------------------------------------
     // 3) Obtener tiempo actual de simulación específica
@@ -112,5 +79,11 @@ public class SimulacionController {
             System.err.println("Error getting snapshot: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    @PostMapping("/{simulationId}/run")
+    public ResponseEntity<Void> runSimulation(@PathVariable String simulationId) {
+        simulacionService.ejecutarSimulacionCompleta(simulationId);
+        return ResponseEntity.accepted().build();
     }
 }

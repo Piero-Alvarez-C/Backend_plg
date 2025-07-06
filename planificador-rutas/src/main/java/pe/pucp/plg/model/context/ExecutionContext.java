@@ -80,6 +80,26 @@ public class ExecutionContext {
     public void setPedidos(List<Pedido> pedidos) { this.pedidos = pedidos; }
 
     public List<Bloqueo> getBloqueos() { return bloqueos; }
+    public void addBloqueo(Bloqueo bloqueo) {
+        if (bloqueo == null) {
+            System.out.println("Null bloqueo, no se añadirá.");
+            return; // Skip null bloqueos
+        }
+        
+        if (bloqueos == null) {
+            bloqueos = new ArrayList<>();
+        }
+        
+        try {
+            bloqueos.add(bloqueo);
+        } catch (Exception e) {
+            // If there's any issue, create a new list and add it
+            System.err.println("Error adding bloqueo, creating new list: " + e.getMessage());
+            List<Bloqueo> newList = new ArrayList<>(bloqueos);
+            newList.add(bloqueo);
+            bloqueos = newList;
+        }
+    }
     public void setBloqueos(List<Bloqueo> bloqueos) { this.bloqueos = bloqueos; }
 
     public List<EntregaEvent> getEventosEntrega() { return eventosEntrega; }

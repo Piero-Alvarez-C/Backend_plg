@@ -61,6 +61,7 @@ public class ParseadorArchivos {
             // Usa el parse que ya tienes en tu BloqueoServiceImpl.parseDesdeLinea()
             // Por simplicidad:
             Bloqueo b = new BloqueoServiceImpl().parseDesdeLinea(linea);
+            b.setDescription(b.getStartTime() + "-" + b.getEndTime());
             lista.add(b);
         }
         return lista;
