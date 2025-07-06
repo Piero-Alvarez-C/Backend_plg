@@ -9,6 +9,10 @@ import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
 
+import java.time.LocalDateTime;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,14 +53,15 @@ public class SimulationManagerService {
         this.operationalContext.setTanques(tanqueService.inicializarTanques()); 
 
         // 3. Initialize Pedidos from PedidoRepository
+        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
-        Map<Integer, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() > 0) // Filter out t=0 for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+        NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
+            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
         
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() == 0)
+            .filter(p -> p.getTiempoCreacion().equals(startTime))
             .collect(Collectors.toList());
         this.operationalContext.setPedidos(new ArrayList<>(initialPedidos)); 
         
@@ -64,7 +69,7 @@ public class SimulationManagerService {
         this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
         
         // 5. Set initial simulation time for operational context
-        this.operationalContext.setCurrentTime(0);
+        this.operationalContext.setCurrentTime(LocalDateTime.of(2025, 1, 1, 0, 0));
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.
     }
@@ -91,20 +96,21 @@ public class SimulationManagerService {
         simContext.setTanques(tanqueService.inicializarTanques());
         
         // Initialize Pedidos from PedidoRepository for the new simulation context
+        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
-        Map<Integer, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() > 0) // Filter out t=0 for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+        NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
+            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         simContext.setPedidosPorTiempo(pedidosPorTiempo);
 
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() == 0)
+            .filter(p -> p.getTiempoCreacion().equals(startTime))
             .collect(Collectors.toList());
         simContext.setPedidos(new ArrayList<>(initialPedidos));
         
         // Initialize Bloqueos from BloqueoRepository for the new simulation context
         simContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
-        simContext.setCurrentTime(0); // Simulations typically start from t=0
+        simContext.setCurrentTime(startTime); // Simulations typically start from t=0
 
         simulationContexts.put(simulationId, simContext);
         return simulationId;

@@ -2,13 +2,14 @@ package pe.pucp.plg.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class BloqueoDTO {
     /** Un identificador único para este bloqueo */
     private String id;
-    private int tiempoInicio;
-    private int tiempoFin;
+    private LocalDateTime tiempoInicio;
+    private LocalDateTime tiempoFin;
     private List<PointDTO> nodes;
     /** Texto descriptivo */
     @JsonProperty("description")
@@ -21,14 +22,14 @@ public class BloqueoDTO {
     public void setId(String id) {
         this.id = id;
     }
-    public int getTiempoInicio() { return tiempoInicio; }
-    public int getTiempoFin() { return tiempoFin; }
+    public LocalDateTime getTiempoInicio() { return tiempoInicio; }
+    public LocalDateTime getTiempoFin() { return tiempoFin; }
     public List<PointDTO> getNodes() { return nodes; }
     public String getDescription() { return description; }
-    public void setTiempoInicio(int tiempoInicio) {
+    public void setTiempoInicio(LocalDateTime tiempoInicio) {
         this.tiempoInicio = tiempoInicio;
     }
-    public void setTiempoFin(int tiempoFin) {
+    public void setTiempoFin(LocalDateTime tiempoFin) {
         this.tiempoFin = tiempoFin;
     }
     public void setNodes(List<PointDTO> nodes) { this.nodes = nodes; }

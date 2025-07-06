@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.service.SimulacionService;
 import pe.pucp.plg.service.SimulationManagerService; 
@@ -39,7 +41,7 @@ public class SimulacionController {
     @PostMapping("/{simulationId}/step")
     public ResponseEntity<SimulacionSnapshotDTO> step(@PathVariable String simulationId) {
         // Step the simulation
-        int nuevoTiempo = simulacionService.stepOneMinute(simulationId);
+        LocalDateTime nuevoTiempo = simulacionService.stepOneMinute(simulationId);
 
         // Get the updated context AFTER the step to create the snapshot
         ExecutionContext simContext = simulationManagerService.getContextoSimulacion(simulationId);
@@ -54,7 +56,7 @@ public class SimulacionController {
         }
         
         // Ensure the context time matches nuevoTiempo, though simContext.getCurrentTime() should be authoritative after step
-        if(simContext.getCurrentTime() != nuevoTiempo) {
+        if(!simContext.getCurrentTime().equals(nuevoTiempo)) {
             // Log potential inconsistency or decide which time is authoritative
             System.err.println("Time mismatch after step: service returned " + nuevoTiempo + ", context has " + simContext.getCurrentTime());
         }
@@ -71,9 +73,9 @@ public class SimulacionController {
     // 3) Obtener tiempo actual de simulación específica
     // ------------------------------------------------------------
     @GetMapping("/{simulationId}/time")
-    public ResponseEntity<Integer> getTime(@PathVariable String simulationId) {
+    public ResponseEntity<LocalDateTime> getTime(@PathVariable String simulationId) {
         try {
-            int tiempoActual = simulacionService.getTiempoActual(simulationId);
+            LocalDateTime tiempoActual = simulacionService.getTiempoActual(simulationId);
             return ResponseEntity.ok(tiempoActual);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);

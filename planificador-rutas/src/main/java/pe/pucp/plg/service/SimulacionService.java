@@ -13,10 +13,12 @@ import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
+import pe.pucp.plg.util.ResourceLoader;
 import pe.pucp.plg.util.MapperUtil;
-import pe.pucp.plg.util.ParseadorArchivos;
 
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.awt.Point;
@@ -26,7 +28,6 @@ public class SimulacionService {
 
     private final SimulationManagerService simulationManagerService;
     private final ACOPlanner acoPlanner;
-    private final ArchivoService archivoService;
     private final EventPublisherService eventPublisher;
 
     private static class Node {
@@ -51,12 +52,10 @@ public class SimulacionService {
     }
 
     @Autowired
-    public SimulacionService(SimulationManagerService simulationManagerService,
-                             ArchivoService archivoService, EventPublisherService eventPublisher) {
+    public SimulacionService(SimulationManagerService simulationManagerService, EventPublisherService eventPublisher) {
         this.simulationManagerService = simulationManagerService;
-        this.acoPlanner = new ACOPlanner(); 
-        this.archivoService = archivoService;
         this.eventPublisher = eventPublisher;
+        this.acoPlanner = new ACOPlanner();
     }
 
     /**
@@ -80,7 +79,7 @@ public class SimulacionService {
      * @param simulationId The ID of the simulation to step forward.
      * @return The new current time of the simulation.
      */
-    public int stepOneMinute(String simulationId) {
+    public LocalDateTime stepOneMinute(String simulationId) {
         // Obtener el contexto de ejecución
         ExecutionContext contexto = simulationManagerService.getContextoSimulacion(simulationId);
         if (contexto == null) {
@@ -92,26 +91,60 @@ public class SimulacionService {
         }
 
         // AVANZAR EL TIEMPO
-        int tiempoActual = contexto.getCurrentTime() + 1;
+        LocalDateTime tiempoActual = contexto.getCurrentTime() != null ?
+                contexto.getCurrentTime().plusMinutes(1) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         contexto.setCurrentTime(tiempoActual);
-        boolean replanificar = (tiempoActual == 0); // Replanificar al inicio siempre
         
-        // 1. Recargar tanques (cada 24 horas)
-        if (tiempoActual > 0 && tiempoActual % 1440 == 0) {
-            System.out.println("⛽ Recarga diaria de tanques en t+" + tiempoActual);
+        // Para verificaciones que necesitan un día nuevo
+        boolean esMediaNoche = tiempoActual.getHour() == 0 && tiempoActual.getMinute() == 0 && !tiempoActual.equals(contexto.getFechaInicio().atStartOfDay());
+        boolean replanificar = tiempoActual.equals(contexto.getFechaInicio().atStartOfDay()); // Replanificar al inicio siempre
+        
+        // 1. Recargar tanques (cada 24 horas) y cargar nuevos pedidos y bloqueos para el siguiente día
+        if (esMediaNoche) {
+            System.out.println("⛽ Recarga diaria de tanques en " + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
                 TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
                 EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
                 eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
             }
+            
+            // Determinar qué día estamos y cargar datos para ese día
+            LocalDate fechaActual = tiempoActual.toLocalDate();
+            long diaActual = fechaActual.toEpochDay() - contexto.getFechaInicio().toEpochDay() + 1;
+            System.out.println("📅 Día " + diaActual + " de la simulación, cargando nuevos datos...");
+            
+            // Solo cargamos datos nuevos si estamos dentro del período de simulación
+            if (diaActual <= contexto.getDuracionDias()) {
+                System.out.println("📅 Cargando datos para el día: " + fechaActual);
+                
+                // Cargar pedidos y bloqueos para este día
+                List<Pedido> nuevoPedidos = ResourceLoader.cargarPedidosParaFecha(fechaActual);
+                List<Bloqueo> nuevoBloqueos = ResourceLoader.cargarBloqueosParaFecha(fechaActual);
+                
+                // Añadir los nuevos pedidos al mapa de pedidos por tiempo
+                for (Pedido p : nuevoPedidos) {
+                    contexto.getPedidosPorTiempo().computeIfAbsent(p.getTiempoCreacion(), k -> new ArrayList<>()).add(p);
+                }
+                
+                // Añadir los nuevos bloqueos
+                contexto.getBloqueos().addAll(nuevoBloqueos);
+                
+                System.out.printf("🔄 Día %d: Cargados %d nuevos pedidos y %d bloqueos%n", 
+                        diaActual, nuevoPedidos.size(), nuevoBloqueos.size());
+                
+                // Si hay nuevos datos, replanificar
+                if (!nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty()) {
+                    replanificar = true;
+                }
+            }
         }
         
-        // 2 Procesar eventrocesarEventosEntrega(contexto, tiempoActual, simulationos de entrega programados
+        // 2. Procesar eventos de entrega programados
         procesarEventosEntrega(contexto, tiempoActual, simulationId);
 
         // 3. Iniciar retorno de camiones
-        procesarRetorno(contexto, tiempoActual,simulationId);
+        procesarRetorno(contexto, tiempoActual, simulationId);
 
         // 4. Avanzar cada camión en sus rutas actuales
         for (CamionEstado c : contexto.getCamiones()) {
@@ -124,13 +157,13 @@ public class SimulacionService {
                 c.setEnRetorno(false);
                 c.setReabastecerEnTanque(null);
                 c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
-                c.setTiempoLibre(tiempoActual + 15); // Tiempo de descarga/recarga
+                c.setTiempoLibre(tiempoActual.plusMinutes(15)); // Tiempo de descarga/recarga
                 
-                System.out.printf("🚚 Camión %s ha completado su retorno y está disponible en t+%d%n", 
-                                 c.getPlantilla().getId(), tiempoActual + 15);
+                System.out.printf("🚚 Camión %s ha completado su retorno y está disponible en %s%n", 
+                                 c.getPlantilla().getId(), tiempoActual.plusMinutes(15));
                 // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
                 CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
-                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
+                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
                 eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
@@ -150,7 +183,7 @@ public class SimulacionService {
         List<Pedido> pedidosAInyectar = new ArrayList<>();
         for (Pedido p : nuevos) {
             double volumenRestante = p.getVolumen();
-
+            
             if (volumenRestante > capacidadMaxCamion) {
                 // 🛠️ Dividir en sub-pedidos de ≤ capacidadMaxCamion
                 while (volumenRestante > 0) {
@@ -176,7 +209,7 @@ public class SimulacionService {
         contexto.getPedidos().addAll(pedidosAInyectar);
 
         for (Pedido p : pedidosAInyectar) {
-            System.out.printf("🆕 t+%d: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite t+%d)%n",
+            System.out.printf("🆕 %s: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite %s)%n",
                     tiempoActual, p.getId(), p.getX(), p.getY(), p.getVolumen(), p.getTiempoLimite());
         }
         if (!pedidosAInyectar.isEmpty()) replanificar = true;
@@ -185,13 +218,13 @@ public class SimulacionService {
         Iterator<Pedido> itP = contexto.getPedidos().iterator();
         while (itP.hasNext()) {
             Pedido p = itP.next();
-            if (!p.isAtendido() && !p.isDescartado() && tiempoActual > p.getTiempoLimite()) {
+            if (!p.isAtendido() && !p.isDescartado() && tiempoActual.isAfter(p.getTiempoLimite())) {
                 // Emitir evento SIMULATION_COLLAPSED con pedido afectado
                 PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
                 EventDTO eventoColapso = EventDTO.of(EventType.SIMULATION_COLLAPSED, pedidoDTO);
                 eventPublisher.publicarEventoSimulacion(simulationId, eventoColapso);
 
-                System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
+                System.out.printf("💥 Colapso en %s, pedido %d incumplido%n",
                         tiempoActual, p.getId());
                 // Marca y elimina para no repetir el colapso
                 p.setDescartado(true);
@@ -200,7 +233,7 @@ public class SimulacionService {
         }
         
         // 7. Procesar averías por turno
-        replanificar |= procesarAverias(contexto, tiempoActual);    
+        replanificar |= procesarAverias(contexto, tiempoActual);
         
         // 8. Preparar el ACO
         List<CamionEstado> flotaEstado = contexto.getCamiones().stream()
@@ -209,50 +242,52 @@ public class SimulacionService {
                 .collect(Collectors.toList());
 
         // 9) Determinar candidatos a replanificar
-        Map<Pedido, Integer> entregaActual = new HashMap<>();
+        Map<Pedido, LocalDateTime> entregaActual = new HashMap<>();
         for (EntregaEvent ev : contexto.getEventosEntrega()) {
             entregaActual.put(ev.getPedido(), ev.time);
         }
         List<Pedido> pendientes = contexto.getPedidos().stream()
-                .filter(p -> !p.isAtendido() && !p.isDescartado() && !p.isProgramado() && p.getTiempoCreacion() <= tiempoActual)
+                .filter(p -> !p.isAtendido() && !p.isDescartado() && !p.isProgramado() && !p.getTiempoCreacion().isAfter(tiempoActual))
                 .collect(Collectors.toList());
 
         List<Pedido> candidatos = new ArrayList<>();
         for (Pedido p : pendientes) {
-            if (tiempoActual + 60 >= p.getTiempoLimite()) {
+            if (tiempoActual.plusMinutes(60).isAfter(p.getTiempoLimite())) {
                 candidatos.add(p);
                 continue;
             }
-            Integer tPrev = entregaActual.get(p);
+            LocalDateTime tPrev = entregaActual.get(p);
             if (tPrev == null) {
                 candidatos.add(p);
             } else {
-                int mejorAlt = tPrev;
+                LocalDateTime mejorAlt = tPrev;
                 for (CamionEstado est : flotaEstado) {
                     if (est.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dt = Math.abs(est.getX() - p.getX()) + Math.abs(est.getY() - p.getY());
-                    int llegada = tiempoActual + dt;
-                    if (llegada < mejorAlt) mejorAlt = llegada;
+                    LocalDateTime llegada = tiempoActual.plusMinutes(dt);
+                    if (llegada.isBefore(mejorAlt)) mejorAlt = llegada;
                 }
-                if (mejorAlt < tPrev) candidatos.add(p);
+                if (mejorAlt.isBefore(tPrev)) candidatos.add(p);
             }
         }
         candidatos.removeIf(p -> {
-            Integer entregaMin = entregaActual.get(p);
-            return entregaMin != null && entregaMin - tiempoActual <= 1;
+            LocalDateTime entregaMin = entregaActual.get(p);
+            return entregaMin != null && entregaMin.isAfter(tiempoActual) && 
+                   entregaMin.isBefore(tiempoActual.plusMinutes(2)); // 1 minute margin
         });
         
         // 9. Replanificar rutas si es necesario
         
         // Si hay nuevos pedidos, averías resueltas, o es inicio de simulación
         if (replanificar) {
-            System.out.println("🔄 Ejecutando replanificación en t+" + tiempoActual);
+            System.out.println("🔄 Ejecutando replanificación en " + tiempoActual);
             
             // 4.1 Solicitar al ACOPlanner que calcule nuevas rutas óptimas
+            // Usamos directamente el LocalDateTime actual
             List<Ruta> nuevasRutas = acoPlanner.planificarRutas(candidatos, flotaEstado, tiempoActual, contexto);
             
             // 4.2 Traducir el plan a acciones concretas sobre el estado real
-            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto,simulationId);
+            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto, simulationId);
             
             // 4.3 Guardar las rutas en el contexto para visualización o análisis
             contexto.setRutas(nuevasRutas);
@@ -266,17 +301,17 @@ public class SimulacionService {
      * @param contexto El contexto de ejecución
      * @param tiempoActual El tiempo actual de la simulación
      */
-    private void procesarEventosEntrega(ExecutionContext contexto, int tiempoActual, String simulationId) {
+    private void procesarEventosEntrega(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
         Iterator<EntregaEvent> itEv = contexto.getEventosEntrega().iterator();
         while (itEv.hasNext()) {
             EntregaEvent ev = itEv.next();
-            if (ev.time == tiempoActual) {
+            if (ev.time.equals(tiempoActual)) {
                 CamionEstado camion = findCamion(ev.getCamionId(), contexto);
                 if (camion != null) {
                     // Actualizar posición y estado del camión
                     camion.setX(ev.getPedido().getX());
                     camion.setY(ev.getPedido().getY());
-                    camion.setTiempoLibre(tiempoActual + 15); // 15 minutos para descargar
+                    camion.setTiempoLibre(tiempoActual.plusMinutes(15)); // 15 minutos para descargar
                     camion.setStatus(CamionEstado.TruckStatus.PROCESSING);
                     
                     // Actualizar capacidad disponible
@@ -288,7 +323,7 @@ public class SimulacionService {
                     // Marcar el pedido como atendido
                     ev.getPedido().setAtendido(true);
                     
-                    System.out.printf("✅ Entrega realizada - Pedido %d por camión %s en t+%d%n", 
+                    System.out.printf("✅ Entrega realizada - Pedido %d por camión %s en %s%n", 
                                      ev.getPedido().getId(), camion.getPlantilla().getId(), tiempoActual);
 
                     // Emitir evento ORDER_STATE_UPDATED a través de EventPublisherService
@@ -308,11 +343,12 @@ public class SimulacionService {
      * @param tiempoActual El tiempo actual de la simulación
      * @return true si se requiere replanificación
      */
-    private void procesarRetorno(ExecutionContext contexto, int tiempoActual, String simulationId) {
+    private void procesarRetorno(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
         Iterator<CamionEstado> it = contexto.getCamiones().iterator();
         while (it.hasNext()) {
             CamionEstado camion = it.next();
-            if(camion.getStatus() == CamionEstado.TruckStatus.PROCESSING && camion.getTiempoLibre() <= tiempoActual) {
+            if(camion.getStatus() == CamionEstado.TruckStatus.PROCESSING && 
+               (camion.getTiempoLibre() == null || !camion.getTiempoLibre().isAfter(tiempoActual))) {
                 double falta = camion.getPlantilla().getCapacidadCarga() - camion.getCapacidadDisponible();
                 int sx = camion.getX(), sy = camion.getY();
                 int dxPlant = contexto.getDepositoX(), dyPlant = contexto.getDepositoY();
@@ -360,11 +396,11 @@ public class SimulacionService {
      * @param tiempoActual El tiempo actual de la simulación
      * @return true si ocurrieron cambios que requieren replanificación
      */
-    private boolean procesarAverias(ExecutionContext contexto, int tiempoActual) {
+    private boolean procesarAverias(ExecutionContext contexto, LocalDateTime tiempoActual) {
         boolean replanificar = false;
         
         // Determinar el turno actual
-        String turnoActual = turnoDeMinuto(tiempoActual);
+        String turnoActual = turnoDeDateTime(tiempoActual);
         
         // Si cambió el turno, limpiar estados de averías anteriores
         if (!turnoActual.equals(contexto.getTurnoAnterior())) {
@@ -380,17 +416,17 @@ public class SimulacionService {
             if (contexto.getAveriasAplicadas().contains(key)) continue;
             
             CamionEstado c = findCamion(entry.getKey(), contexto);
-            if (c != null && c.getTiempoLibre() <= tiempoActual) {
+            if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
                 // Determinar penalización según tipo de avería
                 int penal = entry.getValue().equals("T1") ? 30 : 
                            entry.getValue().equals("T2") ? 60 : 90;
                            
-                c.setTiempoLibre(tiempoActual + penal);
+                c.setTiempoLibre(tiempoActual.plusMinutes(penal));
                 contexto.getAveriasAplicadas().add(key);
                 contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
                 
-                System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta t+%d%n", 
-                                 entry.getValue(), c.getPlantilla().getId(), tiempoActual + penal);
+                System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta %s%n", 
+                                 entry.getValue(), c.getPlantilla().getId(), tiempoActual.plusMinutes(penal));
                                  
                 replanificar = true;
             }
@@ -400,9 +436,9 @@ public class SimulacionService {
         Iterator<String> it = contexto.getCamionesInhabilitados().iterator();
         while (it.hasNext()) {
             CamionEstado c = findCamion(it.next(), contexto);
-            if (c != null && c.getTiempoLibre() <= tiempoActual) {
+            if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
                 it.remove();
-                System.out.printf("🚚 Camión %s reparado y disponible nuevamente en t+%d%n", 
+                System.out.printf("🚚 Camión %s reparado y disponible nuevamente en %s%n", 
                                  c.getPlantilla().getId(), tiempoActual);
                 replanificar = true;
             }
@@ -416,7 +452,7 @@ public class SimulacionService {
      * @param simulationId The ID of the simulation.
      * @return The current time.
      */
-    public int getTiempoActual(String simulationId) {
+    public LocalDateTime getTiempoActual(String simulationId) {
         ExecutionContext currentContext = simulationManagerService.getContextoSimulacion(simulationId);
         if (currentContext == null) {
             throw new IllegalArgumentException("Simulation context not found for ID: " + simulationId);
@@ -425,13 +461,13 @@ public class SimulacionService {
     }
 
     /**
-     * Initiates a new simulation based on input files specified in the request.
-     * @param request The request containing file IDs and simulation name.
+     * Initiates a new simulation based on date range specified in the request.
+     * @param request The request containing fecha inicio, duracion, and simulation name.
      * @return A DTO with the status and ID of the new simulation.
      */
     public SimulationStatusDTO iniciarSimulacion(SimulationRequest request) {
         try {
-            // 1. Crear el contexto. Esta parte está bien.
+            // 1. Crear el contexto
             String simulationId = simulationManagerService.crearContextoSimulacion();
             EventDTO eventoInicio = EventDTO.of(EventType.SIMULATION_STARTED, null); // No payload necesario o poner info básica
             eventPublisher.publicarEventoSimulacion(simulationId, eventoInicio);
@@ -441,44 +477,42 @@ public class SimulacionService {
             if (currentSimContext == null) {
                 throw new RuntimeException("No se pudo crear el contexto de simulación.");
             }
-    
-            // 2. C-FIX: Procesar cada archivo SOLO SI su ID fue proporcionado.
-    
-            // Pedidos (Asumimos que es obligatorio)
-            String fileIdPedidos = request.getFileIdPedidos();
-            if (fileIdPedidos == null || fileIdPedidos.isBlank()) {
-                throw new IllegalArgumentException("El archivo de pedidos es obligatorio.");
-            }
-            String contenidoPedidos = new String(archivoService.obtenerArchivo(fileIdPedidos), StandardCharsets.UTF_8);
-            Map<Integer, List<Pedido>> pedidosPorTiempo = ParseadorArchivos.parsearPedidosPorTiempo(contenidoPedidos);
-            currentSimContext.setPedidosPorTiempo(pedidosPorTiempo);
-            List<Pedido> initialPedidosFromFile = pedidosPorTiempo.getOrDefault(0, new ArrayList<>());
-            currentSimContext.setPedidos(new ArrayList<>(initialPedidosFromFile));
-            if (currentSimContext.getPedidosPorTiempo().containsKey(0)) {
-                 currentSimContext.getPedidosPorTiempo().remove(0); 
-            }
-    
-            // Bloqueos (Opcional)
-            String fileIdBloqueos = request.getFileIdBloqueos();
-            if (fileIdBloqueos != null && !fileIdBloqueos.isBlank()) {
-                String contenidoBloqueos = new String(archivoService.obtenerArchivo(fileIdBloqueos), StandardCharsets.UTF_8);
-                List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenidoBloqueos);
-                currentSimContext.setBloqueos(bloqueos);
-            }
-    
-            // Averías (Opcional)
-            String fileIdAverias = request.getFileIdAverias();
-            if (fileIdAverias != null && !fileIdAverias.isBlank()) {
-                String contenidoAverias = new String(archivoService.obtenerArchivo(fileIdAverias), StandardCharsets.UTF_8);
-                Map<String, Map<String, String>> averiasPorTurno = ParseadorArchivos.parsearAverias(contenidoAverias);
-                currentSimContext.setAveriasPorTurno(averiasPorTurno);
-            }
-    
-            // Mantenimientos (Opcional, si lo tienes)
-            // String fileIdMantenimientos = request.getFileIdMantenimientos();
-            // if (fileIdMantenimientos != null && !fileIdMantenimientos.isBlank()) { ... }
             
-            // 3. Limpiar estados y preparar la respuesta DTO. Esta parte está bien.
+            // 2. Validar la fecha de inicio
+            if (request.getFechaInicio() == null || request.getFechaInicio().isBlank()) {
+                throw new IllegalArgumentException("La fecha de inicio es obligatoria.");
+            }
+            
+            // 3. Convertir la fecha de inicio a LocalDate
+            LocalDate fechaInicio = LocalDate.parse(request.getFechaInicio(), DateTimeFormatter.ISO_LOCAL_DATE);
+            currentSimContext.setFechaInicio(fechaInicio); // Asumimos que este campo existe o lo crearemos después
+            currentSimContext.setDuracionDias(request.getDuracionDias()); // Asumimos que este campo existe
+            
+            // 4. Cargar pedidos y bloqueos para el primer día
+            List<Pedido> pedidosDiaUno = ResourceLoader.cargarPedidosParaFecha(fechaInicio);
+            List<Bloqueo> bloqueosDiaUno = ResourceLoader.cargarBloqueosParaFecha(fechaInicio);
+            
+            // 5. Organizar los pedidos por tiempo e inicializar el tiempo actual
+            LocalDateTime tiempoInicial = fechaInicio.atStartOfDay();
+            currentSimContext.setCurrentTime(tiempoInicial);
+            
+            NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = new TreeMap<>();
+            for (Pedido p : pedidosDiaUno) {
+                pedidosPorTiempo.computeIfAbsent(p.getTiempoCreacion(), k -> new ArrayList<>()).add(p);
+            }
+            currentSimContext.setPedidosPorTiempo(pedidosPorTiempo);
+            
+            // 6. Añadir los pedidos iniciales (tiempo 0) a la lista activa
+            List<Pedido> initialPedidos = pedidosPorTiempo.getOrDefault(tiempoInicial, new ArrayList<>());
+            currentSimContext.setPedidos(new ArrayList<>(initialPedidos));
+            if (currentSimContext.getPedidosPorTiempo().containsKey(tiempoInicial)) {
+                currentSimContext.getPedidosPorTiempo().remove(tiempoInicial);
+            }
+            
+            // 7. Establecer los bloqueos iniciales
+            currentSimContext.setBloqueos(bloqueosDiaUno);
+            
+            // 8. Inicializar las estructuras de datos necesarias
             currentSimContext.getEventosEntrega().clear();
             currentSimContext.getAveriasAplicadas().clear();
             currentSimContext.getCamionesInhabilitados().clear();
@@ -494,7 +528,6 @@ public class SimulacionService {
             return status;
     
         } catch (Exception e) {
-            // Tu `System.err.println` me ayudó a encontrar esto. ¡Excelente!
             System.err.println("Error starting simulation: " + e.getMessage());
             throw new RuntimeException("Error al iniciar simulación con request: " + e.getMessage(), e);
         }
@@ -502,7 +535,7 @@ public class SimulacionService {
 
     // --- Métodos auxiliares privados ---
 
-    private void aplicarRutas(int tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto, String simulationId) {
+    private void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto, String simulationId) {
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
 
         // A) Filtrar rutas que no caben en la flota real
@@ -519,7 +552,7 @@ public class SimulacionService {
                 disponible -= activos.get(idx).getVolumen();
             }
             if (!allFit) {
-                System.out.printf("⚠ t+%d: Ruta descartada para %s (no cabe volumen) → %s%n",
+                System.out.printf("⚠ %s: Ruta descartada para %s (no cabe volumen) → %s%n",
                         tiempoActual, real.getPlantilla().getId(),
                         r.getPedidoIds().stream().map(i -> activos.get(i).getId()).collect(Collectors.toList()));
                 itR.remove();
@@ -549,6 +582,8 @@ public class SimulacionService {
                     condCapacidad
             );
 
+            List<Point> path;
+
             if (camion.getStatus() == CamionEstado.TruckStatus.DELIVERING
                     && esDesvioValido(camion, nuevo, tiempoActual, contexto)
                     && camion.getCapacidadDisponible() >= nuevo.getVolumen()) {
@@ -556,21 +591,22 @@ public class SimulacionService {
                 int idx = posicionOptimaDeInsercion(camion, nuevo, tiempoActual, contexto);
                 camion.getPedidosCargados().add(idx, nuevo);
                 camion.setCapacidadDisponible(camion.getCapacidadDisponible() - nuevo.getVolumen());
-                System.out.printf("🔀 t+%d: Desvío – insertado Pedido #%d en %s en posición %d%n",
+                System.out.printf("🔀 %s: Desvío – insertado Pedido #%d en %s en posición %d%n",
                         tiempoActual, nuevo.getId(), camion.getPlantilla().getId(), idx);
 
                 int cx = camion.getX(), cy = camion.getY();
-                List<Point> path = buildManhattanPath(cx, cy, nuevo.getX(), nuevo.getY(), tiempoActual, contexto);
+                path = buildManhattanPath(cx, cy, nuevo.getX(), nuevo.getY(), tiempoActual, contexto);
                 int pasos = path.size();
                 //int dist = Math.abs(cx - nuevo.getX()) + Math.abs(cy - nuevo.getY());
-                int tViaje = (int) Math.ceil(pasos * (60.0 / 50.0));
+                int minutosViaje = (int) Math.ceil(pasos * (60.0 / 50.0));
 
                 camion.setRuta(path);
                 camion.getHistory().addAll(path);
-                contexto.getEventosEntrega().add(new EntregaEvent(tiempoActual + tViaje, camion.getPlantilla().getId(), nuevo));
+                LocalDateTime tiempoEntrega = tiempoActual.plusMinutes(minutosViaje);
+                contexto.getEventosEntrega().add(new EntregaEvent(tiempoEntrega, camion.getPlantilla().getId(), nuevo));
                 nuevo.setProgramado(true);
-                System.out.printf("🕒 eventoEntrega programado (desvío) t+%d → (%d,%d)%n",
-                        tiempoActual + tViaje, nuevo.getX(), nuevo.getY());
+                System.out.printf("🕒 eventoEntrega programado (desvío) %s → (%d,%d)%n",
+                        tiempoEntrega, nuevo.getX(), nuevo.getY());
 
             } else {
                 // Asignación normal
@@ -582,27 +618,28 @@ public class SimulacionService {
                 for (int pedidoIdx : ruta.getPedidoIds()) {
                     Pedido p = activos.get(pedidoIdx);
                     if (camion.getCapacidadDisponible() < p.getVolumen()) {
-                        System.out.printf("⚠ t+%d: Camión %s sin espacio para Pedido #%d%n",
+                        System.out.printf("⚠ %s: Camión %s sin espacio para Pedido #%d%n",
                                 tiempoActual, camion.getPlantilla().getId(), p.getId());
                         continue;
                     }
-                    System.out.printf("⏱️ t+%d: Asignando Pedido #%d al Camión %s%n (%d,%d)",
+                    System.out.printf("⏱️ %s: Asignando Pedido #%d al Camión %s%n (%d,%d)",
                             tiempoActual, p.getId(), camion.getPlantilla().getId(), p.getX(), p.getY());
 
-                    List<Point> path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual, contexto);
+                    path = buildManhattanPath(cx, cy, p.getX(), p.getY(), tiempoActual, contexto);
                     int dist = path.size();
-                    int tViaje = (int) Math.ceil(dist * (60.0 / 50.0));
+                    int minutosViaje = (int) Math.ceil(dist * (60.0 / 50.0));
 
                     camion.setRuta(path);
                     camion.setPasoActual(0);
                     camion.getHistory().addAll(path);
                     p.setProgramado(true);
 
+                    LocalDateTime tiempoEntrega = tiempoActual.plusMinutes(minutosViaje);
                     contexto.getEventosEntrega().add(new EntregaEvent(
-                            tiempoActual + tViaje, camion.getPlantilla().getId(), p
+                            tiempoEntrega, camion.getPlantilla().getId(), p
                     ));
-                    System.out.printf("🕒 eventoEntrega programado t+%d → (%d,%d)%n",
-                            tiempoActual + tViaje, p.getX(), p.getY());
+                    System.out.printf("🕒 eventoEntrega programado %s → (%d,%d)%n",
+                            tiempoEntrega, p.getX(), p.getY());
                     Point last = path.get(path.size() - 1);
                     // camion.setX(p.getX());
                     // camion.setY(p.getY());
@@ -612,21 +649,21 @@ public class SimulacionService {
         }
     }
 
-    private boolean esDesvioValido(CamionEstado c, Pedido p, int tiempoActual, ExecutionContext contexto) {
+    private boolean esDesvioValido(CamionEstado c, Pedido p, LocalDateTime tiempoActual, ExecutionContext contexto) {
         double disponible = c.getCapacidadDisponible();
-        int hora = tiempoActual;
+        LocalDateTime hora = tiempoActual;
         int prevX = c.getX(), prevY = c.getY();
 
         // — Primer tramo: al NUEVO pedido —
         List<Point> pathToNew = buildManhattanPath(prevX, prevY, p.getX(), p.getY(), hora, contexto);
         if (pathToNew == null) return false;           // imposible alcanzar
-        hora += pathToNew.size();                      // 1 paso = 1 minuto
-        hora += 15;                                    // +15 min de descarga
-        if (hora > p.getTiempoLimite()) return false;
+        hora = hora.plusMinutes(pathToNew.size());     // 1 paso = 1 minuto
+        hora = hora.plusMinutes(15);                   // +15 min de descarga
+        if (hora.isAfter(p.getTiempoLimite())) return false;
         disponible -= p.getVolumen();
         if (disponible < 0) return false;
 
-        // avanzamos “virtualmente” a la posición del pedido
+        // avanzamos "virtualmente" a la posición del pedido
         prevX = p.getX();
         prevY = p.getY();
 
@@ -634,9 +671,9 @@ public class SimulacionService {
         for (Pedido orig : c.getPedidosCargados()) {
             List<Point> pathSeg = buildManhattanPath(prevX, prevY, orig.getX(), orig.getY(), hora, contexto);
             if (pathSeg == null) return false;         // no hay ruta libre
-            hora += pathSeg.size();
-            hora += 15;                                // tiempo de servicio
-            if (hora > orig.getTiempoLimite()) return false;
+            hora = hora.plusMinutes(pathSeg.size());
+            hora = hora.plusMinutes(15);               // tiempo de servicio
+            if (hora.isAfter(orig.getTiempoLimite())) return false;
             disponible -= orig.getVolumen();
             if (disponible < 0) return false;
 
@@ -647,10 +684,10 @@ public class SimulacionService {
         return true;
     }
 
-    private int posicionOptimaDeInsercion(CamionEstado c, Pedido pNuevo, int tiempoActual, ExecutionContext contexto) {
+    private int posicionOptimaDeInsercion(CamionEstado c, Pedido pNuevo, LocalDateTime tiempoActual, ExecutionContext contexto) {
         List<Pedido> originales = c.getPedidosCargados();
         int mejorIdx = originales.size();
-        int mejorHoraEntrega = Integer.MAX_VALUE;
+        LocalDateTime mejorHoraEntrega = tiempoActual.plusYears(100); // Una fecha muy lejana
 
         // Capacidad y posición de arranque reales del camión
         double capacidadOriginal = c.getCapacidadDisponible();
@@ -659,7 +696,7 @@ public class SimulacionService {
         // Probar cada posible posición de inserción
         for (int idx = 0; idx <= originales.size(); idx++) {
             double disponible = capacidadOriginal;
-            int hora = tiempoActual;
+            LocalDateTime hora = tiempoActual;
             int simX = x0, simY = y0;
 
             // Montamos la lista de pedidos en el orden de prueba
@@ -676,11 +713,11 @@ public class SimulacionService {
                     break;
                 }
                 // 2) Tiempo de viaje = número de pasos
-                hora += path.size();
+                hora = hora.plusMinutes(path.size());
                 // 3) Tiempo de servicio (descarga)
-                hora += 15;
+                hora = hora.plusMinutes(15);
                 // 4) Comprobar deadline
-                if (hora > q.getTiempoLimite()) {
+                if (hora.isAfter(q.getTiempoLimite())) {
                     valido = false;
                     break;
                 }
@@ -690,13 +727,13 @@ public class SimulacionService {
                     valido = false;
                     break;
                 }
-                // 6) Avanzar “virtual” a la posición del pedido
+                // 6) Avanzar "virtual" a la posición del pedido
                 simX = q.getX();
                 simY = q.getY();
             }
 
             // Si democrático y acaba antes (mejor horaEntrega), guardamos índice
-            if (valido && hora < mejorHoraEntrega) {
+            if (valido && hora.isBefore(mejorHoraEntrega)) {
                 mejorHoraEntrega = hora;
                 mejorIdx = idx;
             }
@@ -711,14 +748,19 @@ public class SimulacionService {
                 .findFirst().orElse(null);
     }
 
-    private String turnoDeMinuto(int t) {
-        int mod = t % 1440;
-        if (mod < 480) return "T1";
-        else if (mod < 960) return "T2";
-        else return "T3";
+
+    
+    private String turnoDeDateTime(LocalDateTime dateTime) {
+        int hour = dateTime.getHour();
+        int minute = dateTime.getMinute();
+        int minutesOfDay = hour * 60 + minute;
+        
+        if (minutesOfDay < 480) return "T1"; // Antes de las 8:00
+        else if (minutesOfDay < 960) return "T2"; // Entre 8:00 y 16:00
+        else return "T3"; // Después de las 16:00
     }
 
-    private boolean isBlockedMove(int x, int y, int t, ExecutionContext estado) {
+    private boolean isBlockedMove(int x, int y, LocalDateTime t, ExecutionContext estado) {
         for (Bloqueo b : estado.getBloqueos()) {
             // The logic for checking if a point is inside a polygonal block is complex.
             // Assuming a simplified check here. The actual logic resides in Bloqueo.estaBloqueado
@@ -729,7 +771,7 @@ public class SimulacionService {
         return false;
     }
 
-    private List<Point> findPathAStar(Point start, Point end, int startTime, ExecutionContext estado) {
+    private List<Point> findPathAStar(Point start, Point end, LocalDateTime startTime, ExecutionContext estado) {
         PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingInt(node -> node.fCost));
         Set<Point> closedSet = new HashSet<>();
         Map<Point, Node> allNodes = new HashMap<>();
@@ -748,7 +790,8 @@ public class SimulacionService {
             closedSet.add(currentNode.position);
 
             for (Point neighborPos : getNeighbors(currentNode.position)) {
-                if (closedSet.contains(neighborPos) || isBlockedMove(neighborPos.x, neighborPos.y, startTime + currentNode.gCost + 1, estado)) {
+                if (closedSet.contains(neighborPos) || 
+                    isBlockedMove(neighborPos.x, neighborPos.y, startTime.plusMinutes(currentNode.gCost + 1), estado)) {
                     continue;
                 }
 
@@ -787,10 +830,10 @@ public class SimulacionService {
      * @param estado Contexto de ejecución con información de bloqueos
      * @return Lista de puntos que forman la ruta
      */
-    public List<Point> buildManhattanPath(int x1, int y1, int x2, int y2, int tiempoInicial, ExecutionContext estado) {
+    public List<Point> buildManhattanPath(int x1, int y1, int x2, int y2, LocalDateTime tiempoInicial, ExecutionContext estado) {
         List<Point> path = new ArrayList<>();
         Point current = new Point(x1, y1);
-        int t = tiempoInicial;
+        LocalDateTime t = tiempoInicial;
 
         while (current.x != x2 || current.y != y2) {
             Point prev = new Point(current.x, current.y);
@@ -800,13 +843,13 @@ public class SimulacionService {
             else                     current.y--;
 
             Point next = new Point(current.x, current.y);
-            int tiempoLlegada = t + 1;
+            LocalDateTime tiempoLlegada = t.plusMinutes(1);
 
             if (isBlockedMove(next.x, next.y, tiempoLlegada, estado)) {
                 // Invocar A* si hay bloqueo
                 List<Point> alt = findPathAStar(prev, new Point(x2, y2), tiempoLlegada, estado);
                 if (alt == null || alt.isEmpty()) {
-                    System.err.printf("Error: No hay ruta de (%d,%d) a (%d,%d) en t+%d debido a bloqueos%n", 
+                    System.err.printf("Error: No hay ruta de (%d,%d) a (%d,%d) en %s debido a bloqueos%n", 
                                     x1, y1, x2, y2, tiempoInicial);
                     return Collections.emptyList();
                 }

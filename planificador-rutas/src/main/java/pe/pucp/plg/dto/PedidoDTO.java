@@ -1,13 +1,15 @@
 package pe.pucp.plg.dto;
 
+import java.time.LocalDateTime;
+
 public class PedidoDTO {
 
     private int id;
     private String idCliente; // ← agrega esto
     private int x;
     private int y;
-    private int tiempoCreacion;
-    private int tiempoLimite;
+    private LocalDateTime tiempoCreacion;
+    private LocalDateTime tiempoLimite;
     private double volumen;
     private boolean atendido;
     private boolean descartado;
@@ -25,11 +27,11 @@ public class PedidoDTO {
     public int getY() { return y; }
     public void setY(int y) { this.y = y; }
 
-    public int getTiempoCreacion() { return tiempoCreacion; }
-    public void setTiempoCreacion(int tiempoCreacion) { this.tiempoCreacion = tiempoCreacion; }
+    public LocalDateTime getTiempoCreacion() { return tiempoCreacion; }
+    public void setTiempoCreacion(LocalDateTime tiempoCreacion) { this.tiempoCreacion = tiempoCreacion; }
 
-    public int getTiempoLimite() { return tiempoLimite; }
-    public void setTiempoLimite(int tiempoLimite) { this.tiempoLimite = tiempoLimite; }
+    public LocalDateTime getTiempoLimite() { return tiempoLimite; }
+    public void setTiempoLimite(LocalDateTime tiempoLimite) { this.tiempoLimite = tiempoLimite; }
 
     public double getVolumen() { return volumen; }
     public void setVolumen(double volumen) { this.volumen = volumen; }

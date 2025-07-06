@@ -7,6 +7,8 @@ import pe.pucp.plg.model.common.Ruta;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.state.CamionEstado;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,7 +22,7 @@ public class ACOPlanner {
     private static final double RHO = 0.1;     // evaporación
     private static final double Q = 100.0;     // feromona depositada
 
-    public List<Ruta> planificarRutas(List<Pedido> candidatos, List<CamionEstado> flotaParaPlanificar, int tiempoActual, ExecutionContext contexto) {
+    public List<Ruta> planificarRutas(List<Pedido> candidatos, List<CamionEstado> flotaParaPlanificar, LocalDateTime tiempoActual, ExecutionContext contexto) {
         if (candidatos.isEmpty() || flotaParaPlanificar.isEmpty()) {
             return Collections.emptyList();
         }
@@ -40,7 +42,7 @@ public class ACOPlanner {
     // ------------------------------------------------------------
     // 1) Ejecución del algoritmo ACO para el VRP
     // ------------------------------------------------------------
-    private List<Ruta> ejecutarACO(List<Pedido> pedidosActivos, List<CamionEstado> flotaEstado, int tiempoActual) {
+    private List<Ruta> ejecutarACO(List<Pedido> pedidosActivos, List<CamionEstado> flotaEstado, LocalDateTime tiempoActual) {
         int V = flotaEstado.size(), N = pedidosActivos.size();
         double[][] tau = new double[V][N];
         for (double[] row : tau) Arrays.fill(row, 1.0);
@@ -129,7 +131,7 @@ public class ACOPlanner {
             List<Pedido> pedidosActivos,
             List<Integer> noAsignados,
             double[][] tau,
-            int tiempoActual) {
+            LocalDateTime tiempoActual) {
 
         int V = rutas.size();
         double[][] prob = new double[V][pedidosActivos.size()];
@@ -150,7 +152,8 @@ public class ACOPlanner {
                 int dy = Math.abs(c.getY() - p.getY());
                 int distKm = dx + dy;
                 int tiempoViaje = (int) Math.ceil(distKm * minPorKm);
-                if (tiempoActual + tiempoViaje > p.getTiempoLimite()) continue;
+                LocalDateTime tiempoEstimadoLlegada = tiempoActual.plusMinutes(tiempoViaje);
+                if (tiempoEstimadoLlegada.isAfter(p.getTiempoLimite())) continue;
 
                 // 3) filtro combustible
                 double pesoCargaTon = p.getVolumen() * 0.5;
@@ -160,7 +163,11 @@ public class ACOPlanner {
                 if (c.getCombustibleActual() < galNecesarios) continue;
 
                 // heurística + feromona
-                double penalTiempo = 1.0 / (1 + Math.max(0, c.getTiempoLibre() - tiempoActual));
+                long minutesDiff = 0;
+                if (c.getTiempoLibre() != null) {
+                    minutesDiff = Math.max(0, ChronoUnit.MINUTES.between(tiempoActual, c.getTiempoLibre()));
+                }
+                double penalTiempo = 1.0 / (1 + minutesDiff);
                 double eta = 1.0 / (distKm + 1) * penalTiempo;
                 prob[v][idx] = Math.pow(tau[v][idx], ALPHA) * Math.pow(eta, BETA);
             }
@@ -208,7 +215,7 @@ public class ACOPlanner {
             List<Ruta> rutas,
             List<CamionEstado> flotaClonada,
             List<Pedido> pedidosActivos,
-            int tiempoActual) {
+            LocalDateTime tiempoActual) {
 
         Ruta ruta = rutas.get(camionIdx);
         CamionEstado c = findCamionInList(ruta.getCamionId(), flotaClonada);
@@ -224,7 +231,8 @@ public class ACOPlanner {
         double minPorKm = 60.0 / 50.0;
         int tiempoViaje = (int) Math.ceil(distKm * minPorKm);
 
-        if (tiempoActual + tiempoViaje > p.getTiempoLimite()) return false;
+        LocalDateTime tiempoEstimadoLlegada = tiempoActual.plusMinutes(tiempoViaje);
+        if (tiempoEstimadoLlegada.isAfter(p.getTiempoLimite())) return false;
 
         double pesoCargaTon = p.getVolumen() * 0.5;
         double pesoTaraTon  = c.getPlantilla().getTara() / 1000.0;
@@ -233,7 +241,7 @@ public class ACOPlanner {
         if (c.getCombustibleActual() < galNecesarios) return false;
 
         // actualizar estado camión CLONADO
-        c.setTiempoLibre(tiempoActual + tiempoViaje + 15); // +15 min descarga
+        c.setTiempoLibre(tiempoActual.plusMinutes(tiempoViaje + 15)); // +15 min descarga
         c.setX(p.getX());
         c.setY(p.getY());
 
