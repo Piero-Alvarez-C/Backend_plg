@@ -64,7 +64,7 @@ public class OrchestratorService {
      */
     public LocalDateTime stepOneMinute(String simulationId) {
         // Obtener el contexto de ejecución
-        ExecutionContext contexto = simulationManagerService.getContextoSimulacion(simulationId);
+        ExecutionContext contexto = simulationManagerService.getActiveSimulationContext();
         if (contexto == null) {
             if ("operational".equals(simulationId)) {
                 contexto = simulationManagerService.getOperationalContext();

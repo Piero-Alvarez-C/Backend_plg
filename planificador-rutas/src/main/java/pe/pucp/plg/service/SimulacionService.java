@@ -7,6 +7,7 @@ import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
+import pe.pucp.plg.model.control.SimulationControlState;
 import pe.pucp.plg.util.ResourceLoader;
 
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 /**
  * Servicio responsable de la inicialización y ejecución de simulaciones.
@@ -29,6 +31,8 @@ public class SimulacionService {
     private final OrchestratorService orchestratorService;
     private final SimulationManagerService simulationManagerService;
     private final EventPublisherService eventPublisher;
+
+    private Future<?> activeSimulationTask;
     
     @Autowired
     public SimulacionService(OrchestratorService orchestratorService, 
@@ -66,7 +70,7 @@ public class SimulacionService {
             EventDTO eventoInicio = EventDTO.of(EventType.SIMULATION_STARTED, null); // No payload necesario o poner info básica
             eventPublisher.publicarEventoSimulacion(simulationId, eventoInicio);
 
-            ExecutionContext currentSimContext = simulationManagerService.getContextoSimulacion(simulationId);
+            ExecutionContext currentSimContext = simulationManagerService.getActiveSimulationContext();
     
             if (currentSimContext == null) {
                 throw new RuntimeException("No se pudo crear el contexto de simulación.");
@@ -133,7 +137,7 @@ public class SimulacionService {
      * @return El tiempo actual de la simulación
      */
     public LocalDateTime getTiempoActual(String simulationId) {
-        ExecutionContext currentContext = simulationManagerService.getContextoSimulacion(simulationId);
+        ExecutionContext currentContext = simulationManagerService.getActiveSimulationContext();
         if (currentContext == null) {
             throw new IllegalArgumentException("Simulation context not found for ID: " + simulationId);
         }
@@ -146,12 +150,20 @@ public class SimulacionService {
      * @param simulationId El ID de la simulación a ejecutar
      */
     public void ejecutarSimulacionCompleta(String simulationId) {
+        //No iniciar una nueva simulación si ya hay una activa
+        if (activeSimulationTask != null && !activeSimulationTask.isDone()) {
+            System.out.println("Ya hay una simulación activa. No se puede iniciar una nueva.");
+            return;
+        }
+
         // Ejecutar la simulación en un hilo separado
-        CompletableFuture.runAsync(() -> {
+        this.activeSimulationTask = CompletableFuture.runAsync(() -> {
             try {
-                ExecutionContext context = simulationManagerService.getContextoSimulacion(simulationId);
-                if (context == null) {
-                    System.err.println("No se encontró el contexto de simulación: " + simulationId);
+                ExecutionContext context = simulationManagerService.getActiveSimulationContext();
+                SimulationControlState controlState = simulationManagerService.getActiveSimulationControlState();
+
+                if (context == null || controlState == null) {
+                    System.err.println("No se encontró el contexto o el estado de control de la simulación: " + simulationId);
                     return;
                 }
                 
@@ -169,15 +181,13 @@ public class SimulacionService {
                 
                 // Ejecutar la simulación hasta que se alcance la fecha final
                 while (context.getCurrentTime().isBefore(fechaFin)) {
+                    while(controlState.isPaused()) {
+                        Thread.sleep(300);
+                    }
+
                     orchestratorService.stepOneMinute(simulationId);
                     
-                    // Opcional: hacer una pausa para no saturar la CPU
-                    try {
-                        Thread.sleep(300); // Pequeña pausa entre pasos
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+                    Thread.sleep(controlState.getStepDelayMs());
                 }
                 
                 // Publicar evento de fin de simulación
@@ -189,7 +199,23 @@ public class SimulacionService {
                 System.err.println("Error al ejecutar simulación completa: " + e.getMessage());
                 eventPublisher.publicarEventoSimulacion(simulationId, 
                     EventDTO.of(EventType.SIMULATION_ERROR, e.getMessage()));
+            } finally {
+                System.out.println("Finalizando ejecución de simulación " + simulationId);
+                simulationManagerService.destruirContextoSimulacion(simulationId);
+                activeSimulationTask = null; 
             }
         });
+    }
+
+    public void detenerYLimpiarSimulacion(String simulationId) {
+        if (activeSimulationTask != null) {
+            activeSimulationTask.cancel(true);
+        }
+        
+        simulationManagerService.destruirContextoSimulacion(simulationId);
+        
+        activeSimulationTask = null; 
+        
+        System.out.println("🛑 Simulación " + simulationId + " detenida y limpiada por el usuario.");
     }
 }

@@ -69,7 +69,7 @@ public class SimulacionController {
     @GetMapping("/{simulationId}/snapshot")
     public ResponseEntity<SimulacionSnapshotDTO> getSnapshot(@PathVariable String simulationId) {
         try {
-            ExecutionContext context = simulationManagerService.getContextoSimulacion(simulationId);
+            ExecutionContext context = simulationManagerService.getActiveSimulationContext();
             if (context == null) {
                 throw new IllegalArgumentException("Simulación no encontrada con ID: " + simulationId);
             }
@@ -86,4 +86,29 @@ public class SimulacionController {
         simulacionService.ejecutarSimulacionCompleta(simulationId);
         return ResponseEntity.accepted().build();
     }
+
+    @PostMapping("/pause")
+    public ResponseEntity<Void> pauseSimulation() {
+        simulationManagerService.pauseActiveSimulation();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resume")
+    public ResponseEntity<Void> resumeSimulation() {
+        simulationManagerService.resumeActiveSimulation();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/speed")
+    public ResponseEntity<Void> setSimulationSpeed(@RequestBody SpeedRequest speedRequest) {
+        simulationManagerService.setSpeedOfActiveSimulation(speedRequest.getDelayMs());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{simulationId}/stop")
+    public ResponseEntity<Void> stopSimulation(@PathVariable String simulationId) {
+        simulacionService.detenerYLimpiarSimulacion(simulationId); 
+        return ResponseEntity.ok().build();
+    }
+
 }
