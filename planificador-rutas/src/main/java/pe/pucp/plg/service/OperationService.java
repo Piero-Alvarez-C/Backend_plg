@@ -1,5 +1,6 @@
 package pe.pucp.plg.service;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,24 +21,30 @@ import pe.pucp.plg.util.MapperUtil;
 @Service
 public class OperationService {
 
-    private final SimulacionService simulacionService;
+    private final OrchestratorService orchestratorService;
     private final SimulationManagerService simulationManagerService;
     private final EventPublisherService eventPublisher;
 
 
     @Autowired
-    public OperationService(SimulacionService simulacionService, SimulationManagerService simulationManagerService,
+    public OperationService(OrchestratorService orchestratorService,
+                            SimulationManagerService simulationManagerService,
                             EventPublisherService eventPublisher) {
-        this.simulacionService = simulacionService;
+        this.orchestratorService = orchestratorService;
         this.simulationManagerService = simulationManagerService;
         this.eventPublisher = eventPublisher;
+    }
+
+    @PostConstruct
+    public void init() {
+        simulationManagerService.initializeOperationalContext();
     }
 
     // Método que se ejecuta periódicamente para avanzar las operaciones día a día
     @Scheduled(fixedDelayString = "${operaciones.step.delay.ms:60000}") // cada 60 segundos (configurable)
     public void ejecutarOperacionesDiaADia() {
         try {
-            simulacionService.stepOneMinute("operational");
+            orchestratorService.stepOneMinute("operational");
         } catch (Exception e) {
             System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
             e.printStackTrace();
