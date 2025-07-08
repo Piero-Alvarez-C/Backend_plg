@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -114,5 +115,20 @@ public class Bloqueo {
     }
     public void setEndTime(LocalDateTime endTime) {
         this.endTime = endTime;
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Bloqueo bloqueo = (Bloqueo) o;
+        return Objects.equals(startTime, bloqueo.startTime) && 
+               Objects.equals(endTime, bloqueo.endTime) && 
+               Objects.equals(nodes, bloqueo.nodes);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(startTime, endTime, nodes);
     }
 }

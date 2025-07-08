@@ -78,19 +78,36 @@ public class ResourceLoader {
             LocalDate primerDiaDelMes = fecha.withDayOfMonth(1);
             
             // Parsear todos los bloqueos del archivo con fechas absolutas
-            List<Bloqueo> todosLosBloqueos = ParseadorArchivos.parsearBloqueos(contenido, primerDiaDelMes);
+            List<Bloqueo> todosLosBloqueos;
+            try {
+                todosLosBloqueos = ParseadorArchivos.parsearBloqueos(contenido, primerDiaDelMes);
+                System.out.println("Parseados " + todosLosBloqueos.size() + " bloqueos del archivo " + nombreArchivo);
+            } catch (Exception e) {
+                System.err.println("Error al parsear bloqueos del archivo " + nombreArchivo + ": " + e.getMessage());
+                e.printStackTrace();
+                return Collections.emptyList();
+            }
             
             // Filtrar para obtener solo bloqueos que tienen efecto en el día específico
             // El filtro ahora es más simple porque trabajamos con LocalDateTime completo
             LocalDate fechaSiguiente = fecha.plusDays(1);
             
-            return todosLosBloqueos.stream()
+            List<Bloqueo> bloqueosFiltrados = todosLosBloqueos.stream()
+                .filter(b -> b != null && b.getStartTime() != null && b.getEndTime() != null)
                 .filter(b -> !b.getStartTime().toLocalDate().isAfter(fechaSiguiente.minusDays(1)) && 
                              !b.getEndTime().toLocalDate().isBefore(fecha))
                 .toList();
+                
+            System.out.println("Filtrados " + bloqueosFiltrados.size() + " bloqueos para fecha " + fecha);
+            return bloqueosFiltrados;
             
         } catch (IOException e) {
             System.err.println("Error cargando bloqueos para fecha " + fecha + ": " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyList();
+        } catch (Exception e) {
+            System.err.println("Error inesperado cargando bloqueos para fecha " + fecha + ": " + e.getMessage());
+            e.printStackTrace();
             return Collections.emptyList();
         }
     }
