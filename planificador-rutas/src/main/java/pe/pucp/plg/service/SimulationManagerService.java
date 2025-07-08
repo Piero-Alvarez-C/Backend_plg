@@ -9,6 +9,7 @@ import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -50,26 +51,30 @@ public class SimulationManagerService {
         this.operationalContext.setCamiones(flotaFactory.crearNuevaFlota());
 
         // 2. Initialize Tanques
-        this.operationalContext.setTanques(tanqueService.inicializarTanques()); 
+        this.operationalContext.setTanques(tanqueService.inicializarTanques());
 
         // 3. Initialize Pedidos from PedidoRepository
-        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime startTime = LocalDate.now().atStartOfDay();
+
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
+
         NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
+                .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+                .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
-        
+
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion().equals(startTime))
-            .collect(Collectors.toList());
-        this.operationalContext.setPedidos(new ArrayList<>(initialPedidos)); 
-        
+                .filter(p -> p.getTiempoCreacion().equals(startTime))
+                .collect(Collectors.toList());
+        this.operationalContext.setPedidos(new ArrayList<>(initialPedidos));
+
         // 4. Initialize Bloqueos from BloqueoRepository
         this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
-        
+
         // 5. Set initial simulation time for operational context
-        this.operationalContext.setCurrentTime(LocalDateTime.of(2025, 1, 1, 0, 0));
+        this.operationalContext.setFechaInicio(LocalDate.now());
+        this.operationalContext.setCurrentTime(this.operationalContext.getFechaInicio().atStartOfDay());
+
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.
     }
