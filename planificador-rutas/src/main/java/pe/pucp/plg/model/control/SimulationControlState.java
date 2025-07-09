@@ -3,7 +3,7 @@ package pe.pucp.plg.model.control;
 public class SimulationControlState {
 
     private volatile boolean paused = false;
-    private volatile long stepDelayMs = 300; 
+    private volatile long stepDelayMs = 250; 
 
     public boolean isPaused() {
         return paused;

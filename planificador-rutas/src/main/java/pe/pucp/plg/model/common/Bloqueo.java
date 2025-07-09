@@ -10,10 +10,17 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Bloqueo {
+    public enum Estado {
+        INACTIVO,
+        ACTIVO,
+        TERMINADO
+    }
+    
     private LocalDateTime startTime;  // tiempo de inicio
     private LocalDateTime endTime;    // tiempo de fin (exclusivo)
     private final List<Point> nodes; // nodos extremos del bloqueo (poligonal abierta)
     private String description;
+    private Estado lastKnownState = Estado.INACTIVO;
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
 
     public Bloqueo(LocalDateTime startTime, LocalDateTime endTime, List<Point> nodes) {
@@ -115,6 +122,14 @@ public class Bloqueo {
     }
     public void setEndTime(LocalDateTime endTime) {
         this.endTime = endTime;
+    }
+    
+    public Estado getLastKnownState() {
+        return lastKnownState;
+    }
+    
+    public void setLastKnownState(Estado lastKnownState) {
+        this.lastKnownState = lastKnownState;
     }
     
     @Override
