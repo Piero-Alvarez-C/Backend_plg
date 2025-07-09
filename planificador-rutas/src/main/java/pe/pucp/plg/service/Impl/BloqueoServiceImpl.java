@@ -6,6 +6,8 @@ import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.service.BloqueoService;
 
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,12 +17,12 @@ import java.util.List;
 public class BloqueoServiceImpl implements BloqueoService {
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
     @Override
-    public boolean estaActivo(Bloqueo b, int tiempo) {
-        return tiempo >= b.getStartMin() && tiempo < b.getEndMin();
+    public boolean estaActivo(Bloqueo b, LocalDateTime tiempo) {
+        return !tiempo.isBefore(b.getStartTime()) && tiempo.isBefore(b.getEndTime());
     }
 
     @Override
-    public boolean cubrePunto(Bloqueo b, int tiempo, Point p) {
+    public boolean cubrePunto(Bloqueo b, LocalDateTime tiempo, Point p) {
         if (!estaActivo(b, tiempo)) return false;
         List<Point> nodes = b.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
@@ -42,7 +44,7 @@ public class BloqueoServiceImpl implements BloqueoService {
     }
 
     @Override
-    public Bloqueo parseDesdeLinea(String linea) {
+    public Bloqueo parseDesdeLinea(String linea, LocalDate fechaBase) {
         String[] parts = linea.split(":");
         String[] times = parts[0].split("-");
         int s = parseTimeToMinutes(times[0]);
@@ -56,7 +58,12 @@ public class BloqueoServiceImpl implements BloqueoService {
             pts.add(new Point(x, y));
         }
 
-        return new Bloqueo(s, e, pts);
+        // Create base date as Jan 1, 2025 (or any appropriate base date)
+        LocalDateTime baseDateTime = fechaBase.atStartOfDay(); 
+        LocalDateTime startTime = baseDateTime.plusMinutes(s);
+        LocalDateTime endTime = baseDateTime.plusMinutes(e);
+        
+        return new Bloqueo(startTime, endTime, pts);
     }
 
     private int parseTimeToMinutes(String s) {

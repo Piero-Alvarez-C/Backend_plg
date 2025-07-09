@@ -1,32 +1,44 @@
 package pe.pucp.plg.model.common;
 
 import java.awt.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Bloqueo {
-    private final int startMin;      // minuto absoluto de inicio
-    private final int endMin;        // minuto absoluto de fin (exclusivo)
+    public enum Estado {
+        INACTIVO,
+        ACTIVO,
+        TERMINADO
+    }
+    
+    private LocalDateTime startTime;  // tiempo de inicio
+    private LocalDateTime endTime;    // tiempo de fin (exclusivo)
     private final List<Point> nodes; // nodos extremos del bloqueo (poligonal abierta)
     private String description;
+    private Estado lastKnownState = Estado.INACTIVO;
     private static final Pattern TIME_PATTERN = Pattern.compile("(\\d+)d(\\d+)h(\\d+)m");
 
-    public Bloqueo(int startMin, int endMin, List<Point> nodes) {
-        this.startMin = startMin;
-        this.endMin   = endMin;
-        this.nodes    = new ArrayList<>(nodes);
+    public Bloqueo(LocalDateTime startTime, LocalDateTime endTime, List<Point> nodes) {
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.nodes = new ArrayList<>(nodes);
     }
 
     /** Construye un Bloqueo a partir de una línea de tu archivo:
      *  "01d06h00m-01d15h00m:31,21,34,21,..." */
-    public static Bloqueo fromRecord(String record) {
+    public static Bloqueo fromRecord(String record, LocalDateTime baseDateTime) {
         String[] parts = record.split(":");
         String[] times = parts[0].split("-");
-        int s = parseTimeToMinutes(times[0]);
-        int e = parseTimeToMinutes(times[1]);
+        int startMin = parseTimeToMinutes(times[0]);
+        int endMin = parseTimeToMinutes(times[1]);
+        
+        LocalDateTime startTime = baseDateTime.plusMinutes(startMin);
+        LocalDateTime endTime = baseDateTime.plusMinutes(endMin);
 
         String[] coords = parts[1].split(",");
         List<Point> pts = new ArrayList<>();
@@ -35,17 +47,17 @@ public class Bloqueo {
             int y = Integer.parseInt(coords[i+1]);
             pts.add(new Point(x, y));
         }
-        return new Bloqueo(s, e, pts);
+        return new Bloqueo(startTime, endTime, pts);
     }
 
-    /** ¿Está activo a t (minutos desde t=0)? */
-    public boolean isActiveAt(int t) {
-        return t >= startMin && t < endMin;
+    /** ¿Está activo en el tiempo t? */
+    public boolean isActiveAt(LocalDateTime t) {
+        return !t.isBefore(startTime) && t.isBefore(endTime);
     }
 
-    /** ¿Ese punto p está bloqueado a timeMin? */
-    public boolean estaBloqueado(int timeMin, Point p) {
-        if (timeMin < startMin || timeMin >= endMin) return false;
+    /** ¿Ese punto p está bloqueado en el tiempo t? */
+    public boolean estaBloqueado(LocalDateTime t, Point p) {
+        if (t.isBefore(startTime) || !t.isBefore(endTime)) return false;
         // Recorro cada segmento de la poligonal
         for (int i = 0; i < nodes.size() - 1; i++) {
             Point a = nodes.get(i), b = nodes.get(i+1);
@@ -90,11 +102,11 @@ public class Bloqueo {
     }
 
     // Getters (si los necesitas)
-    public int getStartMin() {
-        return startMin;
+    public LocalDateTime getStartTime() {
+        return startTime;
     }
-    public int getEndMin() {
-        return endMin;
+    public LocalDateTime getEndTime() {
+        return endTime;
     }
     public List<Point> getNodes() {
         return Collections.unmodifiableList(nodes);
@@ -104,5 +116,34 @@ public class Bloqueo {
     }
     public String getDescription() {
         return description;
+    }
+    public void setStartTime(LocalDateTime startTime) {
+        this.startTime = startTime;
+    }
+    public void setEndTime(LocalDateTime endTime) {
+        this.endTime = endTime;
+    }
+    
+    public Estado getLastKnownState() {
+        return lastKnownState;
+    }
+    
+    public void setLastKnownState(Estado lastKnownState) {
+        this.lastKnownState = lastKnownState;
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Bloqueo bloqueo = (Bloqueo) o;
+        return Objects.equals(startTime, bloqueo.startTime) && 
+               Objects.equals(endTime, bloqueo.endTime) && 
+               Objects.equals(nodes, bloqueo.nodes);
+    }
+    
+    @Override
+    public int hashCode() {
+        return Objects.hash(startTime, endTime, nodes);
     }
 }

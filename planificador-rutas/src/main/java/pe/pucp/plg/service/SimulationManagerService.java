@@ -5,15 +5,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.factory.FlotaFactory;
 import pe.pucp.plg.model.context.ExecutionContext;
+import pe.pucp.plg.model.control.SimulationControlState;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
 
+import java.time.LocalDateTime;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,7 +28,9 @@ public class SimulationManagerService {
     private final BloqueoRepository bloqueoRepository;
 
     private ExecutionContext operationalContext;
-    private final Map<String, ExecutionContext> simulationContexts = new ConcurrentHashMap<>();
+    private ExecutionContext activeSimulationContext;
+    private String activeSimulationId;
+    private SimulationControlState activeSimulationControlState;
 
     @Autowired
     public SimulationManagerService(FlotaFactory flotaFactory,
@@ -49,14 +54,15 @@ public class SimulationManagerService {
         this.operationalContext.setTanques(tanqueService.inicializarTanques()); 
 
         // 3. Initialize Pedidos from PedidoRepository
+        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
-        Map<Integer, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() > 0) // Filter out t=0 for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
+        NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
+            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
         
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() == 0)
+            .filter(p -> p.getTiempoCreacion().equals(startTime))
             .collect(Collectors.toList());
         this.operationalContext.setPedidos(new ArrayList<>(initialPedidos)); 
         
@@ -64,7 +70,7 @@ public class SimulationManagerService {
         this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
         
         // 5. Set initial simulation time for operational context
-        this.operationalContext.setCurrentTime(0);
+        this.operationalContext.setCurrentTime(LocalDateTime.of(2025, 1, 1, 0, 0));
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.
     }
@@ -84,42 +90,80 @@ public class SimulationManagerService {
      * @return The ID of the newly created simulation context.
      */
     public String crearContextoSimulacion() {
-        String simulationId = UUID.randomUUID().toString();
-        ExecutionContext simContext = new ExecutionContext();
+        if(activeSimulationContext != null) {
+            throw new IllegalStateException("Ya hay una simulación activa con ID: " + activeSimulationId + ". No se puede crear otra.");
+        }
+        this.activeSimulationId = UUID.randomUUID().toString();
+        this.activeSimulationContext = new ExecutionContext();
+        this.activeSimulationControlState = new SimulationControlState();
 
-        simContext.setCamiones(flotaFactory.crearNuevaFlota()); 
-        simContext.setTanques(tanqueService.inicializarTanques());
-        
+        this.activeSimulationContext.setCamiones(flotaFactory.crearNuevaFlota()); 
+        this.activeSimulationContext.setTanques(tanqueService.inicializarTanques());
+
         // Initialize Pedidos from PedidoRepository for the new simulation context
+        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
-        Map<Integer, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() > 0) // Filter out t=0 for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion));
-        simContext.setPedidosPorTiempo(pedidosPorTiempo);
+        NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
+            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
+        this.activeSimulationContext.setPedidosPorTiempo(pedidosPorTiempo);
 
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion() == 0)
+            .filter(p -> p.getTiempoCreacion().equals(startTime))
             .collect(Collectors.toList());
-        simContext.setPedidos(new ArrayList<>(initialPedidos));
+        this.activeSimulationContext.setPedidos(new ArrayList<>(initialPedidos));
         
         // Initialize Bloqueos from BloqueoRepository for the new simulation context
-        simContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
-        simContext.setCurrentTime(0); // Simulations typically start from t=0
+        this.activeSimulationContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
+        this.activeSimulationContext.setCurrentTime(startTime); // Simulations typically start from t=0
 
-        simulationContexts.put(simulationId, simContext);
-        return simulationId;
+        return this.activeSimulationId;
     }
 
-    public ExecutionContext getContextoSimulacion(String id) {
-        ExecutionContext context = simulationContexts.get(id);
-        if (context == null) {
-            // Optionally, log a warning or throw a custom exception
-            // For now, returning null is consistent with Map.get() behavior
+    public ExecutionContext getActiveSimulationContext() {
+        return this.activeSimulationContext;
+    }
+
+    public void destruirContextoSimulacion(String simulationId) {
+        // Solo destruimos si el ID coincide con el de la simulación activa
+        if (simulationId != null && simulationId.equals(this.activeSimulationId)) {
+            this.activeSimulationContext = null;
+            this.activeSimulationId = null;
+            this.activeSimulationControlState = null;
+            System.out.println("🗑️ Contexto de simulación destruido.");
         }
-        return context;
     }
 
-    public void destruirContextoSimulacion(String id) {
-        simulationContexts.remove(id);
+    public SimulationControlState getActiveSimulationControlState() {
+        return this.activeSimulationControlState;
     }
+
+    public void pauseActiveSimulation() {
+        if (activeSimulationControlState != null) {
+            activeSimulationControlState.setPaused(true);
+            System.out.println("⏯️ Simulación activa pausada.");
+        }
+    }
+
+    public void resumeActiveSimulation() {
+        if (activeSimulationControlState != null) {
+            activeSimulationControlState.setPaused(false);
+            System.out.println("▶️ Simulación activa reanudada.");
+        }
+    }
+
+    public void setSpeedOfActiveSimulation(long delayMs) {
+        if (activeSimulationControlState != null) {
+            activeSimulationControlState.setStepDelayMs(delayMs);
+            System.out.println("⏱️ Velocidad de simulación activa ajustada a " + delayMs + "ms de delay.");
+        }
+    }
+
+    public String isAnySimulationActive() {
+        if( activeSimulationContext != null && activeSimulationId != null ) {
+            return activeSimulationId;
+        }
+        return String.valueOf(false);
+    }
+
 }

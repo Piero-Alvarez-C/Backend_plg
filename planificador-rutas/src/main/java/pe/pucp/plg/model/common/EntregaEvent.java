@@ -1,11 +1,13 @@
 package pe.pucp.plg.model.common;
 
+import java.time.LocalDateTime;
+
 public class EntregaEvent {
-    public int time;             // minuto de disparo
+    public LocalDateTime time;   // tiempo de disparo
     private final String camionId;   // Changed from CamionEstado camion
     private final Pedido pedido; // Changed to be final
     
-    public EntregaEvent(int time, String camionId, Pedido pedido) {
+    public EntregaEvent(LocalDateTime time, String camionId, Pedido pedido) {
         this.time = time;
         this.camionId = camionId;
         this.pedido = pedido; 

@@ -1,9 +1,10 @@
 package pe.pucp.plg.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class SimulacionSnapshotDTO {
-    private int tiempoActual;
+    private LocalDateTime tiempoActual;
     private List<CamionDTO> camiones;
     private List<PedidoDTO> pedidos;
     private List<BloqueoDTO> bloqueos;
@@ -12,11 +13,11 @@ public class SimulacionSnapshotDTO {
     private List<RutaDTO> rutas;
 
     // Getters y Setters
-    public int getTiempoActual() {
+    public LocalDateTime getTiempoActual() {
         return tiempoActual;
     }
 
-    public void setTiempoActual(int tiempoActual) {
+    public void setTiempoActual(LocalDateTime tiempoActual) {
         this.tiempoActual = tiempoActual;
     }
 

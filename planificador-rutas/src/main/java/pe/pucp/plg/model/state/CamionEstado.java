@@ -1,6 +1,7 @@
 package pe.pucp.plg.model.state;
 
 import java.awt.Point;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,7 @@ public class CamionEstado {
     // --- Posición y timing ---
     private int x = 12;
     private int y = 8;
-    private int tiempoOcupadoHasta; 
+    private LocalDateTime tiempoLibre; 
     private boolean enRetorno = false; 
     private TruckStatus status = TruckStatus.AVAILABLE;
 
@@ -44,7 +45,8 @@ public class CamionEstado {
 
     // --- Para recarga en tanque ---
     private TanqueDinamico reabastecerEnTanque = null; 
-    private int retHora = 0, retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
+    private LocalDateTime retHora;
+    private int retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
 
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
@@ -55,7 +57,7 @@ public class CamionEstado {
         this.pasoActual = 0;
         this.reabastecerEnTanque = null;
         this.status = TruckStatus.AVAILABLE; 
-        this.tiempoOcupadoHasta = 0; 
+        this.tiempoLibre = null; 
     }
 
     public CamionEstado(CamionEstado original) {
@@ -75,7 +77,7 @@ public class CamionEstado {
         this.pasoActual = original.pasoActual;
         this.reabastecerEnTanque = (original.reabastecerEnTanque != null) ? new TanqueDinamico(original.reabastecerEnTanque) : null;
         this.status = original.status;
-        this.tiempoOcupadoHasta = original.tiempoOcupadoHasta;
+        this.tiempoLibre = original.tiempoLibre;
     }
 
     // Getters
@@ -89,8 +91,8 @@ public class CamionEstado {
     public int getPasoActual() { return pasoActual; }
     public TanqueDinamico getTanqueDestinoRecarga() { return reabastecerEnTanque; } // Alias for getTanqueDestinoRuta
     public TruckStatus getStatus() { return status; }
-    public int getTiempoLibre() { return tiempoOcupadoHasta; }
-    public int getRetHora() { return retHora; }
+    public LocalDateTime getTiempoLibre() { return tiempoLibre; }
+    public LocalDateTime getRetHora() { return retHora; }
     public int getRetStartX() { return retStartX; }
     public int getRetStartY() { return retStartY; }
     public int getRetDestX() { return retDestX; }
@@ -103,7 +105,7 @@ public class CamionEstado {
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
     public void setCombustibleDisponible(double nuevoCombustible) { this.combustibleActual = nuevoCombustible; }
-    public void setTiempoLibre(int nuevoTiempoOcupadoHasta) { this.tiempoOcupadoHasta = nuevoTiempoOcupadoHasta; }
+    public void setTiempoLibre(LocalDateTime nuevoTiempoLibre) { this.tiempoLibre = nuevoTiempoLibre; }
     public void setX(int x) { this.x = x; }
     public void setY(int y) { this.y = y; }   
     public void setStatus(TruckStatus newStatus) { this.status = newStatus; }
@@ -113,7 +115,7 @@ public class CamionEstado {
     }
     public void setPasoActual(int nuevoPaso) { this.pasoActual = nuevoPaso; }
     public void setReabastecerEnTanque(TanqueDinamico tanque) { this.reabastecerEnTanque = tanque; }
-    public void setRetHora(int hora) { this.retHora = hora; }
+    public void setRetHora(LocalDateTime hora) { this.retHora = hora; }
     public void setRetStartX(int x) { this.retStartX = x; }
     public void setRetStartY(int y) { this.retStartY = y; }
     public void setRetDestX(int x) { this.retDestX = x; }
@@ -142,9 +144,9 @@ public class CamionEstado {
         return pasoActual >= rutaActual.size();
     }
 
-    public boolean estaLibre(int tiempoActual) {
+    public boolean estaLibre(LocalDateTime tiempoActual) {
         return (this.status == TruckStatus.AVAILABLE) && 
-               this.tiempoOcupadoHasta <= tiempoActual;
+               (this.tiempoLibre == null || !this.tiempoLibre.isAfter(tiempoActual));
     }
 
     public void recargarCombustible() { 
@@ -183,7 +185,7 @@ public class CamionEstado {
         pasoActual = 0;
         reabastecerEnTanque = null;
         status = TruckStatus.AVAILABLE;
-        tiempoOcupadoHasta = 0;
+        tiempoLibre = null;
         enRetorno = false;
     }
 

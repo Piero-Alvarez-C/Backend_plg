@@ -54,9 +54,9 @@ public class MapperUtil {
 
     public static BloqueoDTO toBloqueoDTO(Bloqueo bloqueo) {
         BloqueoDTO dto = new BloqueoDTO();
-        dto.setId("B-" + bloqueo.getStartMin() + "-" + bloqueo.getEndMin());
-        dto.setTiempoInicio(bloqueo.getStartMin());
-        dto.setTiempoFin(bloqueo.getEndMin());
+        dto.setId("B-" + bloqueo.getStartTime() + "-" + bloqueo.getEndTime());
+        dto.setTiempoInicio(bloqueo.getStartTime());
+        dto.setTiempoFin(bloqueo.getEndTime());
         dto.setDescription(bloqueo.getDescription());
         List<PointDTO> nodesDto = bloqueo.getNodes().stream()
                 .map(MapperUtil::toPointDTO)
@@ -107,10 +107,10 @@ public class MapperUtil {
         SimulacionSnapshotDTO s = new SimulacionSnapshotDTO();
         s.setTiempoActual(estado.getCurrentTime());
         s.setCamiones(estado.getCamiones().stream()
-                .map(camion -> toCamionDTO(camion)).toList()); // Pass tiempoActual
+                .map(camion -> toCamionDTO(camion)).toList()); 
         s.setPedidos(estado.getPedidos().stream()
                 .map(MapperUtil::toPedidoDTO).toList());
-        s.setBloqueos(estado.getBloqueos().stream()
+        s.setBloqueos(estado.getBloqueosActivos().stream()
                 .map(MapperUtil::toBloqueoDTO).toList());
         s.setTanques(estado.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO).toList());
@@ -132,8 +132,8 @@ public class MapperUtil {
         // it would require looking up CamionEstado from ExecutionContext based on
         // camionId.
         // For simplicity, RutaDTO in snapshot will contain camionId.
-        s.setRutas(estado.getRutas().stream()
-                .map(MapperUtil::toRutaDTO).toList());
+        //s.setRutas(estado.getRutas().stream()
+        //        .map(MapperUtil::toRutaDTO).toList());
         return s;
     }
 

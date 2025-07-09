@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.service.SimulacionService;
 import pe.pucp.plg.service.SimulationManagerService;
@@ -25,56 +27,12 @@ public class SimulacionController {
     }
 
     // ------------------------------------------------------------
-    // 1) Reiniciar el contexto operacional (o una simulación base)
-    // ------------------------------------------------------------
-    @PostMapping("/reset")
-    public ResponseEntity<?> resetearOperacional() { 
-        // SimulacionService.iniciarSimulacion() is expected to handle operational context reset/init
-        String result = simulacionService.iniciarSimulacion(); 
-        return ResponseEntity.ok("Resultado: " + result);
-    }
-
-    // ------------------------------------------------------------
-    // 2) Avanzar un minuto de simulación específica
-    // ------------------------------------------------------------
-    @PostMapping("/{simulationId}/step")
-    public ResponseEntity<SimulacionSnapshotDTO> step(@PathVariable String simulationId) {
-        // Step the simulation
-        int nuevoTiempo = simulacionService.stepOneMinute(simulationId);
-
-        // Get the updated context AFTER the step to create the snapshot
-        ExecutionContext simContext = simulationManagerService.getContextoSimulacion(simulationId);
-        if (simContext == null) {
-            // Attempt to get operational context if simulationId suggests it
-            if ("operational".equals(simulationId)) { // Or a constant for operational context ID
-                simContext = simulationManagerService.getOperationalContext();
-            }
-            if (simContext == null) {
-                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null); // Or a more descriptive error DTO
-            }
-        }
-        
-        // Ensure the context time matches nuevoTiempo, though simContext.getCurrentTime() should be authoritative after step
-        if(simContext.getCurrentTime() != nuevoTiempo) {
-            // Log potential inconsistency or decide which time is authoritative
-            System.err.println("Time mismatch after step: service returned " + nuevoTiempo + ", context has " + simContext.getCurrentTime());
-        }
-
-        // Map to SnapshotDTO using the current state of simContext
-        SimulacionSnapshotDTO snapshot = MapperUtil.toSnapshotDTO(simContext);
-        // Override tiempoActual in snapshot if needed, though toSnapshotDTO should use context's time
-        // snapshot.setTiempoActual(simContext.getCurrentTime()); 
-
-        return ResponseEntity.ok(snapshot);
-    }
-
-    // ------------------------------------------------------------
     // 3) Obtener tiempo actual de simulación específica
     // ------------------------------------------------------------
     @GetMapping("/{simulationId}/time")
-    public ResponseEntity<Integer> getTime(@PathVariable String simulationId) {
+    public ResponseEntity<LocalDateTime> getTime(@PathVariable String simulationId) {
         try {
-            int tiempoActual = simulacionService.getTiempoActual(simulationId);
+            LocalDateTime tiempoActual = simulacionService.getTiempoActual(simulationId);
             return ResponseEntity.ok(tiempoActual);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
@@ -101,7 +59,7 @@ public class SimulacionController {
     @GetMapping("/{simulationId}/snapshot")
     public ResponseEntity<SimulacionSnapshotDTO> getSnapshot(@PathVariable String simulationId) {
         try {
-            ExecutionContext context = simulationManagerService.getContextoSimulacion(simulationId);
+            ExecutionContext context = simulationManagerService.getActiveSimulationContext();
             if (context == null) {
                 throw new IllegalArgumentException("Simulación no encontrada con ID: " + simulationId);
             }
@@ -111,6 +69,42 @@ public class SimulacionController {
             System.err.println("Error getting snapshot: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    @PostMapping("/{simulationId}/run")
+    public ResponseEntity<Void> runSimulation(@PathVariable String simulationId) {
+        simulacionService.ejecutarSimulacionCompleta(simulationId);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/pause")
+    public ResponseEntity<Void> pauseSimulation() {
+        simulationManagerService.pauseActiveSimulation();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resume")
+    public ResponseEntity<Void> resumeSimulation() {
+        simulationManagerService.resumeActiveSimulation();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/speed")
+    public ResponseEntity<Void> setSimulationSpeed(@RequestBody SpeedRequest speedRequest) {
+        simulationManagerService.setSpeedOfActiveSimulation(speedRequest.getDelayMs());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{simulationId}/stop")
+    public ResponseEntity<Void> stopSimulation(@PathVariable String simulationId) {
+        simulacionService.detenerYLimpiarSimulacion(simulationId); 
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<String> getActiveSimulation() {
+        String isActive = simulationManagerService.isAnySimulationActive();
+        return ResponseEntity.ok(isActive);
     }
 
     @PostMapping("/{simulationId}/averia")
