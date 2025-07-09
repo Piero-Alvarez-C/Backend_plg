@@ -8,6 +8,7 @@ public class SimulacionSnapshotDTO {
     private List<PedidoDTO> pedidos;
     private List<BloqueoDTO> bloqueos;
     private List<TanqueDTO> tanques;
+    private List<AveriaDTO> averias;
     private List<RutaDTO> rutas;
 
     // Getters y Setters
@@ -50,6 +51,14 @@ public class SimulacionSnapshotDTO {
     public void setTanques(List<TanqueDTO> tanques) {
         this.tanques = tanques;
     }
+    public List<AveriaDTO> getAverias() {
+        return averias;
+    }
+
+    public void setAverias(List<AveriaDTO> averias) {
+        this.averias = averias;
+    }
+
     public List<RutaDTO> getRutas() {
         return rutas;
     }

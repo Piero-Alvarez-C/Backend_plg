@@ -115,6 +115,19 @@ public class MapperUtil {
         s.setTanques(estado.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO).toList());
 
+
+        s.setAverias(
+                estado.getAveriasPorTurno().entrySet().stream()
+                        .flatMap(turnoEntry -> turnoEntry.getValue().entrySet().stream()
+                                .map(avEntry -> {
+                                    AveriaDTO dto = new AveriaDTO();
+                                    dto.setTurno(turnoEntry.getKey());
+                                    dto.setCodigoVehiculo(avEntry.getKey());
+                                    dto.setTipoIncidente(avEntry.getValue());
+                                    return dto;
+                                })
+                        ).toList());
+
         // For RutaDTO, we now map camionId. If full CamionEstadoDTO is needed here,
         // it would require looking up CamionEstado from ExecutionContext based on
         // camionId.
