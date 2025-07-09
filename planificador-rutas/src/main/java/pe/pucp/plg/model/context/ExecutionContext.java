@@ -68,6 +68,8 @@ public class ExecutionContext {
     /** 16) Últimas rutas calculadas (para exponerlas en el snapshot) */
     private List<Ruta> rutas = new ArrayList<>();
 
+    private List<Bloqueo> bloqueosActivos = new ArrayList<>();
+
     // ————— GETTERS y SETTERS (tal como los tienes) —————
 
     public List<CamionEstado> getCamiones() { return camiones; }
@@ -146,6 +148,30 @@ public class ExecutionContext {
                 .filter(t -> t.getPosX() == x && t.getPosY() == y)
                 .findFirst()
                 .orElse(null);
+    }
+
+    public List<Bloqueo> getBloqueosActivos() {
+        return bloqueosActivos;
+    }
+    public void setBloqueosActivos(List<Bloqueo> bloqueosActivos) {
+        this.bloqueosActivos = bloqueosActivos;
+    }
+    public void addBloqueoActivo(Bloqueo bloqueo) {
+        if (bloqueosActivos == null) {
+            bloqueosActivos = new ArrayList<>();
+        }
+        if (bloqueo != null && !bloqueosActivos.contains(bloqueo)) {
+            bloqueosActivos.add(bloqueo);
+        }
+    }
+    public void removeBloqueoActivo(Bloqueo bloqueo) {
+        if (bloqueosActivos == null) {
+            bloqueosActivos = new ArrayList<>();
+            return;
+        }
+        if (bloqueo != null) {
+            bloqueosActivos.remove(bloqueo);
+        }
     }
 
 }

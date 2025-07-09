@@ -78,6 +78,8 @@ public class OrchestratorService {
                 contexto.getCurrentTime().plusMinutes(1) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         contexto.setCurrentTime(tiempoActual);
         
+        // Actualizar los bloqueos activos en este tiempo
+        
         // Para verificaciones que necesitan un día nuevo
         boolean esMediaNoche = tiempoActual.getHour() == 0 && tiempoActual.getMinute() == 0 && !tiempoActual.equals(contexto.getFechaInicio().atStartOfDay());
         boolean replanificar = tiempoActual.equals(contexto.getFechaInicio().atStartOfDay()); // Replanificar al inicio siempre
@@ -133,6 +135,8 @@ public class OrchestratorService {
                 }
             }
         }
+
+        actualizarBloqueosActivos(contexto, tiempoActual, simulationId);
         
         // 2. Procesar eventos de entrega programados
         procesarEventosEntrega(contexto, tiempoActual, simulationId);
@@ -144,6 +148,9 @@ public class OrchestratorService {
         for (CamionEstado c : contexto.getCamiones()) {
             if (c.tienePasosPendientes()) {
                 c.avanzarUnPaso(); // El camión se mueve según su ruta actual
+                CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
+                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_POSITION_UPDATED, camionDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             } else if(c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                 // Camión ha llegado al final de su ruta de retorno
                 c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
@@ -166,7 +173,15 @@ public class OrchestratorService {
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
             nuevos = Collections.emptyList();
+        } else {
+            for(Pedido p : nuevos) {
+                PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
+                EventDTO eventoPedido = EventDTO.of(EventType.ORDER_CREATED, pedidoDTO);
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoPedido);
+            }
         }
+
+        
         
         // 5.a Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
         double capacidadMaxCamion = contexto.getCamiones().stream()
@@ -791,5 +806,56 @@ public class OrchestratorService {
         }
         path.removeFirst(); 
         return path;
+    }
+
+    /**
+     * Actualiza los bloqueos activos en el contexto para el tiempo actual.
+     * Publica eventos de actualización de bloqueo si hay cambios.
+     * 
+     * @param contexto El contexto de ejecución
+     * @param tiempoActual El tiempo actual de la simulación
+     * @param simulationId El ID de la simulación
+     */
+    private void actualizarBloqueosActivos(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
+        List<Bloqueo> todosBloqueos = contexto.getBloqueos();
+        
+        // 1. Verificar bloqueos que deberían activarse
+        for (Bloqueo b : todosBloqueos) {
+            // Si el bloqueo está activo en este tiempo pero no estaba activo antes
+            if (b.isActiveAt(tiempoActual) && b.getLastKnownState() != Bloqueo.Estado.ACTIVO) {
+                // Añadir a la lista de activos
+                contexto.addBloqueoActivo(b);
+                // Actualizar estado
+                b.setLastKnownState(Bloqueo.Estado.ACTIVO);
+                
+                // Notificar al frontend que un bloqueo ha comenzado
+                EventDTO eventoBloqueoInicio = EventDTO.of(EventType.BLOCKAGE_STARTED, MapperUtil.toBloqueoDTO(b));
+                eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoInicio);
+                
+                System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
+                        tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
+            }
+        }
+        
+        // 2. Verificar bloqueos que deberían desactivarse
+        List<Bloqueo> bloqueosActivos = new ArrayList<>(contexto.getBloqueosActivos());
+        for (Bloqueo b : bloqueosActivos) {
+            if (!b.isActiveAt(tiempoActual)) {
+                // Si estaba marcado como activo, notificamos que ha terminado
+                if (b.getLastKnownState() == Bloqueo.Estado.ACTIVO) {
+                    // Eliminar de la lista de activos
+                    contexto.removeBloqueoActivo(b);
+                    // Actualizar estado
+                    b.setLastKnownState(Bloqueo.Estado.TERMINADO);
+                    
+                    // Notificar al frontend que un bloqueo ha terminado
+                    EventDTO eventoBloqueoFin = EventDTO.of(EventType.BLOCKAGE_ENDED, MapperUtil.toBloqueoDTO(b));
+                    eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoFin);
+                    
+                    System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
+                            tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
+                }
+            }
+        }
     }
 }
