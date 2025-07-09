@@ -26,17 +26,6 @@ public class SimulacionController {
     }
 
     // ------------------------------------------------------------
-    // 1) Reiniciar el contexto operacional (o una simulación base)
-    // ------------------------------------------------------------
-    @PostMapping("/reset")
-    public ResponseEntity<?> resetearOperacional() { 
-        // SimulacionService.iniciarSimulacion() is expected to handle operational context reset/init
-        String result = simulacionService.iniciarSimulacion(); 
-        return ResponseEntity.ok("Resultado: " + result);
-    }
-
-
-    // ------------------------------------------------------------
     // 3) Obtener tiempo actual de simulación específica
     // ------------------------------------------------------------
     @GetMapping("/{simulationId}/time")
@@ -109,6 +98,12 @@ public class SimulacionController {
     public ResponseEntity<Void> stopSimulation(@PathVariable String simulationId) {
         simulacionService.detenerYLimpiarSimulacion(simulationId); 
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<String> getActiveSimulation() {
+        String isActive = simulationManagerService.isAnySimulationActive();
+        return ResponseEntity.ok(isActive);
     }
 
 }

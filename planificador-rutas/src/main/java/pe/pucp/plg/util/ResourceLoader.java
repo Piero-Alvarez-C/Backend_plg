@@ -91,7 +91,7 @@ public class ResourceLoader {
             // Filtrar para obtener solo bloqueos que tienen efecto en el día específico
             // El filtro ahora es más simple porque trabajamos con LocalDateTime completo
             LocalDate fechaSiguiente = fecha.plusDays(1);
-            
+
             List<Bloqueo> bloqueosFiltrados = todosLosBloqueos.stream()
                 .filter(b -> b != null && b.getStartTime() != null && b.getEndTime() != null)
                 .filter(b -> !b.getStartTime().toLocalDate().isAfter(fechaSiguiente.minusDays(1)) && 

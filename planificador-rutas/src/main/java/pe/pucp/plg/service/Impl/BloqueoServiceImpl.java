@@ -6,6 +6,7 @@ import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.service.BloqueoService;
 
 import java.awt.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
@@ -43,7 +44,7 @@ public class BloqueoServiceImpl implements BloqueoService {
     }
 
     @Override
-    public Bloqueo parseDesdeLinea(String linea) {
+    public Bloqueo parseDesdeLinea(String linea, LocalDate fechaBase) {
         String[] parts = linea.split(":");
         String[] times = parts[0].split("-");
         int s = parseTimeToMinutes(times[0]);
@@ -58,7 +59,7 @@ public class BloqueoServiceImpl implements BloqueoService {
         }
 
         // Create base date as Jan 1, 2025 (or any appropriate base date)
-        LocalDateTime baseDateTime = LocalDateTime.of(2025, 1, 1, 0, 0);
+        LocalDateTime baseDateTime = fechaBase.atStartOfDay(); 
         LocalDateTime startTime = baseDateTime.plusMinutes(s);
         LocalDateTime endTime = baseDateTime.plusMinutes(e);
         

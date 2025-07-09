@@ -89,9 +89,6 @@ public class OrchestratorService {
             System.out.println("⛽ Recarga diaria de tanques en " + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
-                //TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
-                //EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
             }
             
             // Determinar qué día estamos y cargar datos para ese día
@@ -147,10 +144,7 @@ public class OrchestratorService {
         // 4. Avanzar cada camión en sus rutas actuales
         for (CamionEstado c : contexto.getCamiones()) {
             if (c.tienePasosPendientes()) {
-                c.avanzarUnPaso(); // El camión se mueve según su ruta actual
-                //CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
-                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_POSITION_UPDATED, camionDTO);
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
+                c.avanzarUnPaso();
             } else if(c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                 // Camión ha llegado al final de su ruta de retorno
                 c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
@@ -162,10 +156,6 @@ public class OrchestratorService {
                 
                 System.out.printf("🚚 Camión %s ha completado su retorno y está disponible en %s%n", 
                                  c.getPlantilla().getId(), tiempoActual.plusMinutes(15));
-                // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
-                //CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
-                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
         
@@ -173,15 +163,7 @@ public class OrchestratorService {
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
             nuevos = Collections.emptyList();
-        } else {
-            for(Pedido p : nuevos) {
-                //PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
-                //EventDTO eventoPedido = EventDTO.of(EventType.ORDER_CREATED, pedidoDTO);
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoPedido);
-            }
-        }
-
-        
+        }         
         
         // 5.a Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
         double capacidadMaxCamion = contexto.getCamiones().stream()
@@ -338,11 +320,6 @@ public class OrchestratorService {
                     System.out.printf("✅ Entrega realizada - Pedido %d por camión %s en %s%n", 
                                      ev.getPedido().getId(), camion.getPlantilla().getId(), tiempoActual);
 
-                    // Emitir evento ORDER_STATE_UPDATED a través de EventPublisherService
-                    //PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(ev.getPedido());
-                    //EventDTO evento2 = EventDTO.of(EventType.ORDER_STATE_UPDATED, pedidoDTO);
-                    //eventPublisher.publicarEventoSimulacion(simulationId, evento2); // Método para topic dinámico /topic/simulation/{id}
-                    // Eliminar el evento procesado
                     itEv.remove();
                 }
             }
@@ -393,10 +370,6 @@ public class OrchestratorService {
                 camion.setRuta(returnPath);
                 camion.setPasoActual(0);
                 camion.getHistory().addAll(returnPath);
-                // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
-                //CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
-                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
     }
@@ -490,10 +463,6 @@ public class OrchestratorService {
 
         // B) Aplicar cada ruta al estado real
         for (Ruta ruta : rutas) {
-            // Emitir evento ROUTE_ASSIGNED para cada ruta asignada
-            //RutaDTO rutaDTO = MapperUtil.toRutaDTO(ruta);
-            //EventDTO eventoRuta = EventDTO.of(EventType.ROUTE_ASSIGNED,rutaDTO);
-            //eventPublisher.publicarEventoSimulacion(simulationId, eventoRuta);
 
             CamionEstado camion = findCamion(ruta.getCamionId(), contexto);
             Pedido nuevo = activos.get(ruta.getPedidoIds().get(0));
@@ -830,10 +799,7 @@ public class OrchestratorService {
                 contexto.addBloqueoActivo(b);
                 // Actualizar estado
                 b.setLastKnownState(Bloqueo.Estado.ACTIVO);
-                
-                // Notificar al frontend que un bloqueo ha comenzado
-                //EventDTO eventoBloqueoInicio = EventDTO.of(EventType.BLOCKAGE_STARTED, MapperUtil.toBloqueoDTO(b));
-                //eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoInicio);
+            
                 
                 System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
                         tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
@@ -850,10 +816,6 @@ public class OrchestratorService {
                     contexto.removeBloqueoActivo(b);
                     // Actualizar estado
                     b.setLastKnownState(Bloqueo.Estado.TERMINADO);
-                    
-                    // Notificar al frontend que un bloqueo ha terminado
-                    //EventDTO eventoBloqueoFin = EventDTO.of(EventType.BLOCKAGE_ENDED, MapperUtil.toBloqueoDTO(b));
-                    //eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoFin);
                     
                     System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
                             tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());

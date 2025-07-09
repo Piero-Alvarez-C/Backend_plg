@@ -60,7 +60,7 @@ public class ParseadorArchivos {
             if (linea.isBlank()) continue;
             // Usa el parse que ya tienes en tu BloqueoServiceImpl.parseDesdeLinea()
             // Por simplicidad:
-            Bloqueo b = new BloqueoServiceImpl().parseDesdeLinea(linea);
+            Bloqueo b = new BloqueoServiceImpl().parseDesdeLinea(linea, fechaPrimerDiaDelMes);
             b.setDescription(b.getStartTime() + "-" + b.getEndTime());
             lista.add(b);
         }
