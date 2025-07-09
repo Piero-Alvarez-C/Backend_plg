@@ -2,16 +2,8 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
-
-
-import pe.pucp.plg.dto.AveriaDTO;
-import pe.pucp.plg.dto.SimulationRequest;
-import pe.pucp.plg.dto.SimulationStatusDTO;
-import pe.pucp.plg.model.common.Averia;
-
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
@@ -61,70 +53,6 @@ public class SimulacionService {
         return "operational_context_reset_or_initialized";
     }
     
-//--------------------------mover a orchestratorservice.java--------------------------------------------//
-  
-  
-  ///version mejorada pasar a orchestratorservice.java
-  /*
-    private boolean procesarAverias(ExecutionContext contexto, int tiempoActual) {
-        boolean replanificar = false;
-        
-        // Determinar el turno actual
-        String turnoActual = turnoDeMinuto(tiempoActual);
-        
-        // Si cambió el turno, limpiar estados de averías anteriores
-
-        if (!turnoActual.equals(contexto.getTurnoAnterior())) {
-            contexto.setTurnoAnterior(turnoActual);
-            contexto.getAveriasAplicadas().clear();
-            contexto.getCamionesInhabilitados().clear();          
-        }
-        
-        // Aplicar averías programadas para este turno
-        Map<String, String> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
-   
-        for (Map.Entry<String, String> entry : averiasTurno.entrySet()) {
-            String key = turnoActual + "_" + entry.getKey();
-            if (contexto.getAveriasAplicadas().contains(key)) continue;
-            
-            CamionEstado c = findCamion(entry.getKey(), contexto);
-            //System.out.printf("📌 TgetTiempoLibre: %d%n", c.getTiempoLibre());
-            //System.out.printf("📌 tiempoActual : %d%n",tiempoActual);
-            if (c != null && c.getTiempoLibre() <= tiempoActual) {
-                // Determinar penalización según tipo de avería
-                String tipoaveria = entry.getValue();
-                int penal=calcularTiempoAveria(turnoActual,tipoaveria,tiempoActual);           
-                c.setTiempoLibre(tiempoActual + penal);
-                c.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
-                contexto.getAveriasAplicadas().add(key);
-                contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
-                
-                System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta t+%d%n", 
-                                 entry.getValue(), c.getPlantilla().getId(), tiempoActual + penal);
-                                 
-                replanificar = true;
-            }
-        }
-        
-        // Revisar camiones que ya pueden volver a servicio
-        Iterator<String> it = contexto.getCamionesInhabilitados().iterator();
-        while (it.hasNext()) {
-            CamionEstado c = findCamion(it.next(), contexto);
-            if (c != null && c.getTiempoLibre() <= tiempoActual) {
-                it.remove();
-                c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
-                System.out.printf("🚚 Camión %s reparado y disponible nuevamente en t+%d%n", 
-                                 c.getPlantilla().getId(), tiempoActual);
-                replanificar = true;
-            }
-        }
-        
-        return replanificar;
-    }        
-  */
-
-
-
     /**
      * Inicia una simulación basada en los parámetros de la solicitud.
      * @param request La solicitud con los parámetros de simulación
@@ -203,7 +131,6 @@ public class SimulacionService {
         }
     }
 
-
     /**
      * Obtiene el tiempo actual de una simulación específica.
      * @param simulationId El ID de la simulación
@@ -215,85 +142,7 @@ public class SimulacionService {
             throw new IllegalArgumentException("Simulation context not found for ID: " + simulationId);
         }
         return currentContext.getCurrentTime();
-    }          
-
-
-    ///---------------------------------mover a orchestratorservice-----------------------------------/
-  
-
-    private String turnoDeMinuto(int t) {
-        int mod = t % 1440;
-        if (mod < 480) return "T1";
-        else if (mod < 960) return "T2";
-        else return "T3";
     }
-
-
-    public static int calcularTiempoAveria(String turnoActual, String tipoIncidente  ,int tiempoActual) {
-        int inactividad = 0;
-
-        switch (tipoIncidente) {
-            case "T1":
-                // Tipo 1: 2 horas en sitio (120 minutos)
-                inactividad = 120;
-                break;
-
-            case "T2":
-                // Tipo 2: 2 horas en sitio + 1 turno en taller
-                inactividad = 120;  // Inmovilización inicial
-
-                switch (turnoActual) {
-                    case "T1":
-                        // Disponible en turno 3 del mismo día
-                        inactividad += (480 * 1);  // Turno 2 completo
-                        break;
-                    case "T2":
-                        // Disponible en turno 1 del día siguiente
-                        inactividad += (480 * 2);  // Turno 3 + Turno 1
-                        break;
-                    case "T3":
-                        // Disponible en turno 2 del día siguiente
-                        inactividad += (480 * 3);  // Turno 1 + Turno 2
-                        break;
-                }
-                break;
-
-            case "T3":
-                // Tipo 3: 4 horas en sitio + 1 día completo en taller (día A+2, Turno 1)
-                inactividad = 240;  // Inmovilización inicial
-
-                int minutosRestantesDelDia = 1440 - (tiempoActual % 1440);
-                inactividad += minutosRestantesDelDia; // Resto del día actual
-                inactividad += 1440 * 2;     // Dos días completos más (Día A+1 y Día A+2)
-                break;
-
-            default:
-                System.out.println("Tipo de incidente desconocido: " + tipoIncidente);
-                break;
-        }
-
-        return inactividad;
-    }
-  
-  
-  ///--------------------------------------------------------------------/
-
-    public Averia registrarAveriaSimulacion(String simulationId,AveriaDTO dto) {
-        ExecutionContext operationalContext = simulationManagerService.getContextoSimulacion(simulationId);
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-        String turno= dto.getTurno();
-        String camionId= dto.getCodigoVehiculo();
-        String tipoAveria= dto.getTipoIncidente();
-        Averia nuevAveria= new Averia(turno,camionId,tipoAveria);
-        operationalContext.getAveriasPorTurno()
-                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
-        System.out.println("Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
-        return nuevAveria;
-    }
-
-
     
     /**
      * Ejecuta una simulación completa de manera asíncrona.

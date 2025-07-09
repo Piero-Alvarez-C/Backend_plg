@@ -2,10 +2,8 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
-import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 
@@ -16,17 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors; // Added
 
 import pe.pucp.plg.model.state.CamionEstado;
-
-import pe.pucp.plg.dto.BloqueoDTO; // Added
-import pe.pucp.plg.dto.CamionDTO;
-import pe.pucp.plg.dto.PedidoDTO;
-import pe.pucp.plg.dto.TanqueDTO; // Added
-import pe.pucp.plg.dto.AveriaDTO;
 import pe.pucp.plg.util.MapperUtil;
-
-
-import java.util.Map;
-
 
 @Service
 public class OperationService {
@@ -42,10 +30,8 @@ public class OperationService {
 
     /**
      * Registers a new order into the operational context.
-     * If the order's creation time matches the current operational time, it's added
-     * to active orders.
+     * If the order's creation time matches the current operational time, it's added to active orders.
      * Otherwise, it's added to the time-based order map for future activation.
-     * 
      * @param nuevoPedido The new order to register.
      */
     public void registrarNuevoPedido(Pedido nuevoPedido) {
@@ -63,13 +49,12 @@ public class OperationService {
             operationalContext.getPedidos().add(nuevoPedido);
         } else if (nuevoPedido.getTiempoCreacion().isAfter(operationalContext.getCurrentTime())) {
             operationalContext.getPedidosPorTiempo()
-                    .computeIfAbsent(nuevoPedido.getTiempoCreacion(), k -> new ArrayList<>()).add(nuevoPedido);
+                .computeIfAbsent(nuevoPedido.getTiempoCreacion(), k -> new ArrayList<>()).add(nuevoPedido);
         } else {
-            // Handle or log pedidos created in the past if necessary,
+            // Handle or log pedidos created in the past if necessary, 
             // for now, adding to current pedidos if it's somehow missed.
-            System.err.println("Warning: Registering a pedido with a creation time in the past: " + nuevoPedido.getId()
-                    + " at time " + nuevoPedido.getTiempoCreacion() + " while current time is "
-                    + operationalContext.getCurrentTime());
+            System.err.println("Warning: Registering a pedido with a creation time in the past: " + nuevoPedido.getId() 
+                + " at time " + nuevoPedido.getTiempoCreacion() + " while current time is " + operationalContext.getCurrentTime());
             operationalContext.getPedidos().add(nuevoPedido);
         }
         // Potentially trigger re-planning or notify other components
@@ -77,45 +62,34 @@ public class OperationService {
 
     /**
      * Registers a vehicle breakdown in the operational context.
-     * 
-     * @param camionId   The ID of the truck that broke down.
+     * @param camionId The ID of the truck that broke down.
      * @param tipoAveria A description or type of the breakdown.
-     * @param turno      El turno en que ocurrió la avería ("T1", "T2", "T3")
+     * @param turno El turno en que ocurrió la avería ("T1", "T2", "T3")
      */
-    //public void registrarAveriaCamion(String camionId, String tipoAveria, String turno)
-    public Averia registrarAveriaCamion(AveriaDTO dto) {
+    public void registrarAveriaCamion(String camionId, String tipoAveria, String turno) {
         ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
-        String turno= dto.getTurno();
-        String camionId= dto.getCodigoVehiculo();
-        String tipoAveria= dto.getTipoIncidente();
-        Averia nuevAveria= new Averia(turno,camionId,tipoAveria);
-        operationalContext.getAveriasPorTurno()
-                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
 
-    
+        operationalContext.getAveriasPorTurno()
+            .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
+        
         // Mark the truck as unavailable if the breakdown is for the current/active turn
-        // This logic might be more complex depending on how turns are managed vs.
-        // currentTime
-        // For simplicity, if an averia is registered, we might immediately mark the
-        // truck as inhabilitado.
+        // This logic might be more complex depending on how turns are managed vs. currentTime
+        // For simplicity, if an averia is registered, we might immediately mark the truck as inhabilitado.
         operationalContext.getCamionesInhabilitados().add(camionId);
 
         // Find the CamionEstado and update its status if necessary
         operationalContext.getCamiones().stream()
-                .filter(c -> c.getPlantilla().getId().equals(camionId))
-                .findFirst()
-                .ifPresent(camion -> {
-                    System.out.println("Estado antes: " + camion.getStatus());
-                    camion.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
-                    System.out.println("Estado después: " + camion.getStatus());
-                    System.out.println(
-                            "Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
-                });
+            .filter(c -> c.getPlantilla().getId().equals(camionId))
+            .findFirst()
+            .ifPresent(camion -> {
+                // camion.setStatus(CamionEstado.TruckStatus.OUT_OF_SERVICE); // Or a similar status
+                // Potentially clear its current route, etc.
+                System.out.println("Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
+            });
         // Potentially trigger re-planning
-        return nuevAveria;
     }
 
     /**
@@ -135,7 +109,6 @@ public class OperationService {
         List<Pedido> nuevosPedidosParaEsteMinuto = operationalContext.getPedidosPorTiempo().remove(nuevoTiempo);
         if (nuevosPedidosParaEsteMinuto != null && !nuevosPedidosParaEsteMinuto.isEmpty()) {
             operationalContext.getPedidos().addAll(nuevosPedidosParaEsteMinuto);
-
             System.out.println("Activated " + nuevosPedidosParaEsteMinuto.size() + " new pedidos at time " + nuevoTiempo);
             // Emitir eventos ORDER_CREATED para cada pedido activado
             for (Pedido pedido : nuevosPedidosParaEsteMinuto) {
@@ -143,18 +116,15 @@ public class OperationService {
                 EventDTO pedidoEvent = EventDTO.of(EventType.ORDER_CREATED, dto);
                 eventPublisher.publicarEventoOperacion(pedidoEvent);
             }
-
         }
 
         // Advance each truck in the operational context
-        // This is a simplified advancement; real logic might be in CamionEstado or a
-        // dedicated planner
+        // This is a simplified advancement; real logic might be in CamionEstado or a dedicated planner
         for (CamionEstado camion : operationalContext.getCamiones()) {
             if (!operationalContext.getCamionesInhabilitados().contains(camion.getPlantilla().getId())) {
                 // camion.avanzarPasoEnRutaActual(); // Assuming CamionEstado has this method
                 // For now, just a placeholder action or logging
-                // System.out.println("Advancing truck " + camion.getPlantilla().getId() + " in
-                // operational context.");
+                // System.out.println("Advancing truck " + camion.getPlantilla().getId() + " in operational context.");
             }
         }
         // Potentially trigger other time-dependent events or re-planning
@@ -196,14 +166,12 @@ public class OperationService {
                 operationalContext.getCurrentTime(), // Use operational context's current time
                 dto.getX(), dto.getY(),
                 dto.getVolumen(), dto.getTiempoLimite());
-
         
         // Use the existing registrarNuevoPedido logic which handles adding to current or future pedidos
         registrarNuevoPedido(nuevo);
         PedidoDTO nuevoDTO = MapperUtil.toPedidoDTO(nuevo);
         EventDTO evento = EventDTO.of(EventType.ORDER_CREATED, nuevoDTO);
         eventPublisher.publicarEventoOperacion(evento);
-
         return nuevo;
     }
 
@@ -219,20 +187,6 @@ public class OperationService {
                 .map(MapperUtil::toBloqueoDTO)
                 .collect(Collectors.toList());
     }
-    //implementar o solo en el front?
-    /*public List<AveriaDTO> getAveriasOperacionalesDTO() {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext.get == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-        if (operationalContext.getAverias() == null) {
-            return new ArrayList<>();
-        }
-        return operationalContext.getAverias().stream()
-                .map(MapperUtil::toAveriaDTO)
-                .collect(Collectors.toList());
-    }*/
-
 
     public List<TanqueDTO> getTanquesOperacionalesDTO() { // Added method
         ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
@@ -248,8 +202,7 @@ public class OperationService {
     }
 
     private CamionEstado findCamionOperacionalById(String id, ExecutionContext operationalContext) {
-        // ExecutionContext operationalContext =
-        // simulationManagerService.getOperationalContext(); // Removed
+        // ExecutionContext operationalContext = simulationManagerService.getOperationalContext(); // Removed
         // Caller now ensures operationalContext is not null.
         if (operationalContext.getCamiones() == null) {
             return null;
@@ -270,8 +223,8 @@ public class OperationService {
             return false;
         }
         // operationalContext already fetched
-        camion.reset();
-        operationalContext.getCamionesInhabilitados().remove(id);
+        camion.reset(); 
+        operationalContext.getCamionesInhabilitados().remove(id); 
         System.out.println("Camion " + id + " reset in operational context.");
         // Emitir evento TRUCK_STATE_UPDATED
         CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
@@ -290,12 +243,12 @@ public class OperationService {
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
-        CamionEstado camion = findCamionOperacionalById(id, operationalContext);
+        CamionEstado camion = findCamionOperacionalById(id, operationalContext); 
         // operationalContext already fetched
         if (camion == null || operationalContext.getCamionesInhabilitados().contains(id)) {
             return false;
         }
-        camion.avanzarUnPaso();
+        camion.avanzarUnPaso(); 
         System.out.println("Camion " + id + " advanced one step in operational context.");
         // ✅ Publicar evento TRUCK_STATE_UPDATED al topic (channel)
         CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
@@ -313,7 +266,7 @@ public class OperationService {
         if (camion == null) {
             return false;
         }
-        camion.recargarCombustible();
+        camion.recargarCombustible(); 
         System.out.println("Camion " + id + " refueled in operational context.");
         // 🟢 1. Enviar TRUCK_STATE_UPDATED (envía el id y el estado del camión)
         CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
@@ -332,17 +285,13 @@ public class OperationService {
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
-        // Logic to handle generic events in the operational context using
-        // 'operationalContext'
-        System.out.println("Evento '" + evento.toString() + "' registrado en contexto operacional. Context time: "
-                + operationalContext.getCurrentTime());
-        // Example: if (evento instanceof AveriaCamionInput) {
-        // AveriaCamionInput averiaInput = (AveriaCamionInput) evento;
-        // operationalContext.getAveriasPorTurno()
-        // .computeIfAbsent(averiaInput.getTurno(), k -> new
-        // java.util.HashMap<>()).put(averiaInput.getCamionId(),
-        // averiaInput.getTipoAveria());
-        // operationalContext.getCamionesInhabilitados().add(averiaInput.getCamionId());
+        // Logic to handle generic events in the operational context using 'operationalContext'
+        System.out.println("Evento '" + evento.toString() + "' registrado en contexto operacional. Context time: " + operationalContext.getCurrentTime());
+        // Example: if (evento instanceof AveriaCamionInput) { 
+        //    AveriaCamionInput averiaInput = (AveriaCamionInput) evento;
+        //    operationalContext.getAveriasPorTurno()
+        //        .computeIfAbsent(averiaInput.getTurno(), k -> new java.util.HashMap<>()).put(averiaInput.getCamionId(), averiaInput.getTipoAveria());
+        //    operationalContext.getCamionesInhabilitados().add(averiaInput.getCamionId());
         // }
     }
 }
