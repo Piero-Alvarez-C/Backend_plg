@@ -55,15 +55,17 @@ public class SimulationManagerService {
         this.operationalContext.setTanques(tanqueService.inicializarTanques());
 
         // 3. Initialize Pedidos from PedidoRepository
-        LocalDateTime startTime = LocalDate.now().atStartOfDay();
+        LocalDateTime startTime = LocalDateTime.now();  // Fecha y hora actual precisa al momento de iniciar
 
         List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
 
+        // Filtrar pedidos que tengan tiempoCreacion igual o posterior a startTime (incluyendo hora)
         NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
                 .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
                 .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
 
+        // Pedidos exactamente en startTime (mismo instante)
         List<Pedido> initialPedidos = todosLosPedidos.stream()
                 .filter(p -> p.getTiempoCreacion().equals(startTime))
                 .collect(Collectors.toList());
@@ -73,8 +75,8 @@ public class SimulationManagerService {
         this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
 
         // 5. Set initial simulation time for operational context
-        this.operationalContext.setFechaInicio(LocalDate.now());
-        this.operationalContext.setCurrentTime(this.operationalContext.getFechaInicio().atStartOfDay());
+        this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
+        this.operationalContext.setCurrentTime(startTime.minusMinutes(1));                     // fecha y hora
 
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.

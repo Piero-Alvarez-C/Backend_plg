@@ -29,13 +29,6 @@ public class OperacionesController {
         return ResponseEntity.ok("Contexto operativo reseteado");
     }
 
-    // Endpoint para avanzar manualmente un paso en operaciones (opcional)
-    @PostMapping("/step")
-    public ResponseEntity<String> avanzarPaso() {
-        operacionesService.ejecutarOperacionesDiaADia();
-        return ResponseEntity.ok("Operaciones avanzadas un minuto");
-    }
-
     // Endpoint para obtener el snapshot/estado actual del contexto operativo
     @GetMapping("/snapshot")
     public ResponseEntity<ExecutionContext> obtenerSnapshot() {

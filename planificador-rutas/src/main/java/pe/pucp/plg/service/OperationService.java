@@ -41,10 +41,11 @@ public class OperationService {
     }
 
     // Método que se ejecuta periódicamente para avanzar las operaciones día a día
-    @Scheduled(fixedDelayString = "${operaciones.step.delay.ms:60000}") // cada 60 segundos (configurable)
+    @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo
     public void ejecutarOperacionesDiaADia() {
         try {
             orchestratorService.stepOneMinute("operational");
+            System.out.println("Ejecutando operaciones día a día en: " + LocalDateTime.now());
         } catch (Exception e) {
             System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
             e.printStackTrace();
@@ -78,10 +79,14 @@ public class OperationService {
         }
 
         if (nuevoPedido.getTiempoCreacion().equals(operationalContext.getCurrentTime())) {
-            operationalContext.getPedidos().add(nuevoPedido);
+            List<Pedido> listaPedidos = new ArrayList<>();//para que se procese el pedido con tiempo en stepOneMinute
+            listaPedidos.add(nuevoPedido);
+            operationalContext.getPedidosPorTiempo().put(nuevoPedido.getTiempoCreacion().plusMinutes(1), listaPedidos);
+            System.out.println("Sí agregó el pedido a la lista para ser atendido en el tiempo: "+nuevoPedido.getTiempoCreacion());
         } else if (nuevoPedido.getTiempoCreacion().isAfter(operationalContext.getCurrentTime())) {
             operationalContext.getPedidosPorTiempo()
                 .computeIfAbsent(nuevoPedido.getTiempoCreacion(), k -> new ArrayList<>()).add(nuevoPedido);
+            System.out.println("Hizo un cambio en el pedido a ser atendido, nuevo tiempo de creacion: "+ nuevoPedido.getTiempoCreacion());
         } else {
             // Handle or log pedidos created in the past if necessary, 
             // for now, adding to current pedidos if it's somehow missed.

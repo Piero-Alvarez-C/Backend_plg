@@ -77,7 +77,7 @@ public class OrchestratorService {
         LocalDateTime tiempoActual = contexto.getCurrentTime() != null ?
                 contexto.getCurrentTime().plusMinutes(1) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         contexto.setCurrentTime(tiempoActual);
-        
+        System.out.println("Cambia el tiempo actual de las operaciones a : " + tiempoActual);
         // Para verificaciones que necesitan un día nuevo
         boolean esMediaNoche = tiempoActual.getHour() == 0 && tiempoActual.getMinute() == 0 && !tiempoActual.equals(contexto.getFechaInicio().atStartOfDay());
         boolean replanificar = tiempoActual.equals(contexto.getFechaInicio().atStartOfDay()); // Replanificar al inicio siempre
@@ -166,7 +166,9 @@ public class OrchestratorService {
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
             nuevos = Collections.emptyList();
+            System.out.println("No inyectó ningún pedido");
         }
+        System.out.println("Cantidad de pedido a inyectar: " + nuevos.size());
         
         // 5.a Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
         double capacidadMaxCamion = contexto.getCamiones().stream()
@@ -201,6 +203,7 @@ public class OrchestratorService {
 
         // 5.b) Añadir realmente los pedidos (reemplazo de los nuevos originales)
         contexto.getPedidos().addAll(pedidosAInyectar);
+        System.out.println("Cantidad de pedidos procesados: " + contexto.getPedidos().size());
 
         for (Pedido p : pedidosAInyectar) {
             System.out.printf("🆕 %s: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite %s)%n",
