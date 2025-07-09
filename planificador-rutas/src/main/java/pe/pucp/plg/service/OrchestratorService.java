@@ -89,9 +89,9 @@ public class OrchestratorService {
             System.out.println("⛽ Recarga diaria de tanques en " + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
-                TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
-                EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
+                //TanqueDTO tanqueDTO = MapperUtil.toTanqueDTO(tq);
+                //EventDTO eventoTanque = EventDTO.of(EventType.TANK_LEVEL_UPDATED, tanqueDTO);
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoTanque);
             }
             
             // Determinar qué día estamos y cargar datos para ese día
@@ -148,9 +148,9 @@ public class OrchestratorService {
         for (CamionEstado c : contexto.getCamiones()) {
             if (c.tienePasosPendientes()) {
                 c.avanzarUnPaso(); // El camión se mueve según su ruta actual
-                CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
-                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_POSITION_UPDATED, camionDTO);
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
+                //CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
+                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_POSITION_UPDATED, camionDTO);
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             } else if(c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                 // Camión ha llegado al final de su ruta de retorno
                 c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
@@ -163,9 +163,9 @@ public class OrchestratorService {
                 System.out.printf("🚚 Camión %s ha completado su retorno y está disponible en %s%n", 
                                  c.getPlantilla().getId(), tiempoActual.plusMinutes(15));
                 // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
-                CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
-                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
+                //CamionDTO camionDTO = MapperUtil.toCamionDTO(c);
+                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
         
@@ -175,9 +175,9 @@ public class OrchestratorService {
             nuevos = Collections.emptyList();
         } else {
             for(Pedido p : nuevos) {
-                PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
-                EventDTO eventoPedido = EventDTO.of(EventType.ORDER_CREATED, pedidoDTO);
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoPedido);
+                //PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(p);
+                //EventDTO eventoPedido = EventDTO.of(EventType.ORDER_CREATED, pedidoDTO);
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoPedido);
             }
         }
 
@@ -301,7 +301,10 @@ public class OrchestratorService {
             // 4.3 Guardar las rutas en el contexto para visualización o análisis
             contexto.setRutas(nuevasRutas);
         }
-        
+
+        // Mandar por socket un snapshot del estado actual
+        EventDTO estadoActual = EventDTO.of(EventType.SNAPSHOT, MapperUtil.toSnapshotDTO(contexto));
+        eventPublisher.publicarEventoSimulacion(simulationId, estadoActual);
         return contexto.getCurrentTime();
     }
     
@@ -336,9 +339,9 @@ public class OrchestratorService {
                                      ev.getPedido().getId(), camion.getPlantilla().getId(), tiempoActual);
 
                     // Emitir evento ORDER_STATE_UPDATED a través de EventPublisherService
-                    PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(ev.getPedido());
-                    EventDTO evento2 = EventDTO.of(EventType.ORDER_STATE_UPDATED, pedidoDTO);
-                    eventPublisher.publicarEventoSimulacion(simulationId, evento2); // Método para topic dinámico /topic/simulation/{id}
+                    //PedidoDTO pedidoDTO = MapperUtil.toPedidoDTO(ev.getPedido());
+                    //EventDTO evento2 = EventDTO.of(EventType.ORDER_STATE_UPDATED, pedidoDTO);
+                    //eventPublisher.publicarEventoSimulacion(simulationId, evento2); // Método para topic dinámico /topic/simulation/{id}
                     // Eliminar el evento procesado
                     itEv.remove();
                 }
@@ -391,9 +394,9 @@ public class OrchestratorService {
                 camion.setPasoActual(0);
                 camion.getHistory().addAll(returnPath);
                 // Emitir evento TRUCK_STATE_UPDATED a través de EventPublisherService
-                CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
-                EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
+                //CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
+                //EventDTO eventoCamion = EventDTO.of(EventType.TRUCK_STATE_UPDATED,camionDTO);
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoCamion);
             }
         }
     }
@@ -488,9 +491,9 @@ public class OrchestratorService {
         // B) Aplicar cada ruta al estado real
         for (Ruta ruta : rutas) {
             // Emitir evento ROUTE_ASSIGNED para cada ruta asignada
-            RutaDTO rutaDTO = MapperUtil.toRutaDTO(ruta);
-            EventDTO eventoRuta = EventDTO.of(EventType.ROUTE_ASSIGNED,rutaDTO);
-            eventPublisher.publicarEventoSimulacion(simulationId, eventoRuta);
+            //RutaDTO rutaDTO = MapperUtil.toRutaDTO(ruta);
+            //EventDTO eventoRuta = EventDTO.of(EventType.ROUTE_ASSIGNED,rutaDTO);
+            //eventPublisher.publicarEventoSimulacion(simulationId, eventoRuta);
 
             CamionEstado camion = findCamion(ruta.getCamionId(), contexto);
             Pedido nuevo = activos.get(ruta.getPedidoIds().get(0));
@@ -829,8 +832,8 @@ public class OrchestratorService {
                 b.setLastKnownState(Bloqueo.Estado.ACTIVO);
                 
                 // Notificar al frontend que un bloqueo ha comenzado
-                EventDTO eventoBloqueoInicio = EventDTO.of(EventType.BLOCKAGE_STARTED, MapperUtil.toBloqueoDTO(b));
-                eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoInicio);
+                //EventDTO eventoBloqueoInicio = EventDTO.of(EventType.BLOCKAGE_STARTED, MapperUtil.toBloqueoDTO(b));
+                //eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoInicio);
                 
                 System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
                         tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
@@ -849,8 +852,8 @@ public class OrchestratorService {
                     b.setLastKnownState(Bloqueo.Estado.TERMINADO);
                     
                     // Notificar al frontend que un bloqueo ha terminado
-                    EventDTO eventoBloqueoFin = EventDTO.of(EventType.BLOCKAGE_ENDED, MapperUtil.toBloqueoDTO(b));
-                    eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoFin);
+                    //EventDTO eventoBloqueoFin = EventDTO.of(EventType.BLOCKAGE_ENDED, MapperUtil.toBloqueoDTO(b));
+                    //eventPublisher.publicarEventoSimulacion(simulationId, eventoBloqueoFin);
                     
                     System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
                             tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
