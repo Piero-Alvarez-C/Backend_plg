@@ -44,6 +44,7 @@ public class OperationService {
     @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo
     public void ejecutarOperacionesDiaADia() {
         try {
+            System.out.println("======================================OPERACIONES===================================================");
             orchestratorService.stepOneMinute("operational");
         } catch (Exception e) {
             System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
