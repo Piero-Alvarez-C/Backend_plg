@@ -185,8 +185,8 @@ public class SimulacionService {
                         Thread.sleep(300);
                     }
 
-                    orchestratorService.stepOneMinute(simulationId);
-                    
+                    orchestratorService.stepOneMinute(context, simulationId);
+
                     Thread.sleep(controlState.getStepDelayMs());
                 }
                 

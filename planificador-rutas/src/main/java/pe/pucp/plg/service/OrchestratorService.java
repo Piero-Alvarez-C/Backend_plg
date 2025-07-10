@@ -27,7 +27,6 @@ public class OrchestratorService {
 
     private final ACOPlanner acoPlanner;
     private final EventPublisherService eventPublisher;
-    private final SimulationManagerService simulationManagerService;
 
     private static class Node {
         Point position;
@@ -51,10 +50,9 @@ public class OrchestratorService {
     }
 
     @Autowired
-    public OrchestratorService(EventPublisherService eventPublisher, SimulationManagerService simulationManagerService) {
+    public OrchestratorService(EventPublisherService eventPublisher) {
         this.acoPlanner = new ACOPlanner();
         this.eventPublisher = eventPublisher;
-        this.simulationManagerService = simulationManagerService;
     }
 
     /**
@@ -62,21 +60,13 @@ public class OrchestratorService {
      * @param simulationId The ID of the simulation to step forward.
      * @return The new current time of the simulation.
      */
-    public LocalDateTime stepOneMinute(String simulationId) {
-        // Obtener el contexto de ejecución
-        ExecutionContext contexto = simulationManagerService.getActiveSimulationContext();
-        if (contexto == null) {
-            if ("operational".equals(simulationId)) {
-                contexto = simulationManagerService.getOperationalContext();
-            } else {
-                throw new IllegalArgumentException("Simulation context not found for ID: " + simulationId);
-            }
-        }
+    public LocalDateTime stepOneMinute(ExecutionContext contexto, String simulationId) {
 
         // AVANZAR EL TIEMPO
         LocalDateTime tiempoActual = contexto.getCurrentTime() != null ?
-                contexto.getCurrentTime().plusMinutes(1) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+                contexto.getCurrentTime().plusMinutes(1).withSecond(0).withNano(0) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         contexto.setCurrentTime(tiempoActual);
+
         
         // Actualizar los bloqueos activos en este tiempo
         
@@ -133,13 +123,13 @@ public class OrchestratorService {
             }
         }
 
-        actualizarBloqueosActivos(contexto, tiempoActual, simulationId);
+        actualizarBloqueosActivos(contexto, tiempoActual);
         
         // 2. Procesar eventos de entrega programados
-        procesarEventosEntrega(contexto, tiempoActual, simulationId);
+        procesarEventosEntrega(contexto, tiempoActual);
 
         // 3. Iniciar retorno de camiones
-        procesarRetorno(contexto, tiempoActual, simulationId);
+        procesarRetorno(contexto, tiempoActual);
 
         // 4. Avanzar cada camión en sus rutas actuales
         for (CamionEstado c : contexto.getCamiones()) {
@@ -160,10 +150,16 @@ public class OrchestratorService {
         }
         
         // 5. Incorporar nuevos pedidos que llegan en este tiempo
+        if ("operational".equals(simulationId)) {
+            System.out.println("Cantidad de pedidos del contexto operacional: "+ contexto.getPedidosPorTiempo().size());
+            System.out.println("Cambia el tiempo actual de las operaciones a : " + tiempoActual);
+        }
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
             nuevos = Collections.emptyList();
-        }         
+            System.out.println("No inyectó ningún pedido");
+        } 
+        System.out.println("Cantidad de pedidos a inyectar: " + nuevos.size());
         
         // 5.a Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
         double capacidadMaxCamion = contexto.getCamiones().stream()
@@ -198,6 +194,7 @@ public class OrchestratorService {
 
         // 5.b) Añadir realmente los pedidos (reemplazo de los nuevos originales)
         contexto.getPedidos().addAll(pedidosAInyectar);
+        System.out.println("Cantidad de pedidos procesados: " + contexto.getPedidos().size());
 
         for (Pedido p : pedidosAInyectar) {
             System.out.printf("🆕 %s: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite %s)%n",
@@ -278,7 +275,7 @@ public class OrchestratorService {
             List<Ruta> nuevasRutas = acoPlanner.planificarRutas(candidatos, flotaEstado, tiempoActual, contexto);
             
             // 4.2 Traducir el plan a acciones concretas sobre el estado real
-            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto, simulationId);
+            aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto);
             
             // 4.3 Guardar las rutas en el contexto para visualización o análisis
             contexto.setRutas(nuevasRutas);
@@ -295,7 +292,7 @@ public class OrchestratorService {
      * @param contexto El contexto de ejecución
      * @param tiempoActual El tiempo actual de la simulación
      */
-    private void procesarEventosEntrega(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
+    private void procesarEventosEntrega(ExecutionContext contexto, LocalDateTime tiempoActual) {
         Iterator<EntregaEvent> itEv = contexto.getEventosEntrega().iterator();
         while (itEv.hasNext()) {
             EntregaEvent ev = itEv.next();
@@ -332,7 +329,7 @@ public class OrchestratorService {
      * @param tiempoActual El tiempo actual de la simulación
      * @return true si se requiere replanificación
      */
-    private void procesarRetorno(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
+    private void procesarRetorno(ExecutionContext contexto, LocalDateTime tiempoActual) {
         Iterator<CamionEstado> it = contexto.getCamiones().iterator();
         while (it.hasNext()) {
             CamionEstado camion = it.next();
@@ -437,7 +434,7 @@ public class OrchestratorService {
     
     // --- Métodos auxiliares privados ---
 
-    private void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto, String simulationId) {
+    private void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto) {
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
 
         // A) Filtrar rutas que no caben en la flota real
@@ -788,7 +785,7 @@ public class OrchestratorService {
      * @param tiempoActual El tiempo actual de la simulación
      * @param simulationId El ID de la simulación
      */
-    private void actualizarBloqueosActivos(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
+    private void actualizarBloqueosActivos(ExecutionContext contexto, LocalDateTime tiempoActual) {
         List<Bloqueo> todosBloqueos = contexto.getBloqueos();
         
         // 1. Verificar bloqueos que deberían activarse

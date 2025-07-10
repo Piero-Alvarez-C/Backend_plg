@@ -1,13 +1,13 @@
 package pe.pucp.plg.service;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
-
-import java.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,15 +19,46 @@ import pe.pucp.plg.util.MapperUtil;
 @Service
 public class OperationService {
 
-    @Autowired
-    private EventPublisherService eventPublisher;
+    private final OrchestratorService orchestratorService;
     private final SimulationManagerService simulationManagerService;
+    private final EventPublisherService eventPublisher;
+
 
     @Autowired
-    public OperationService(SimulationManagerService simulationManagerService) {
+    public OperationService(OrchestratorService orchestratorService,
+                            SimulationManagerService simulationManagerService,
+                            EventPublisherService eventPublisher) {
+        this.orchestratorService = orchestratorService;
         this.simulationManagerService = simulationManagerService;
+        this.eventPublisher = eventPublisher;
     }
 
+    @PostConstruct
+    public void init() {
+        simulationManagerService.initializeOperationalContext();
+    }
+
+    // Método que se ejecuta periódicamente para avanzar las operaciones día a día
+    @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo
+    public void ejecutarOperacionesDiaADia() {
+        try {
+            System.out.println("======================================OPERACIONES===================================================");
+            orchestratorService.stepOneMinute(simulationManagerService.getOperationalContext(), "operational");
+        } catch (Exception e) {
+            System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Método para reiniciar el contexto operativo
+    public void resetOperacional() {
+        simulationManagerService.initializeOperationalContext();
+    }
+
+    // Método para obtener el contexto operativo actual
+    public SimulacionSnapshotDTO getSnapshot() {
+        return MapperUtil.toSnapshotDTO(simulationManagerService.getOperationalContext());
+    }
     /**
      * Registers a new order into the operational context.
      * If the order's creation time matches the current operational time, it's added to active orders.
@@ -46,10 +77,14 @@ public class OperationService {
         }
 
         if (nuevoPedido.getTiempoCreacion().equals(operationalContext.getCurrentTime())) {
-            operationalContext.getPedidos().add(nuevoPedido);
+            List<Pedido> listaPedidos = new ArrayList<>();//para que se procese el pedido con tiempo en stepOneMinute
+            listaPedidos.add(nuevoPedido);
+            operationalContext.getPedidosPorTiempo().put(nuevoPedido.getTiempoCreacion().plusMinutes(1), listaPedidos);
+            System.out.println("Sí agregó el pedido a la lista para ser atendido en el tiempo: "+nuevoPedido.getTiempoCreacion());
         } else if (nuevoPedido.getTiempoCreacion().isAfter(operationalContext.getCurrentTime())) {
             operationalContext.getPedidosPorTiempo()
                 .computeIfAbsent(nuevoPedido.getTiempoCreacion(), k -> new ArrayList<>()).add(nuevoPedido);
+            System.out.println("Hizo un cambio en el pedido a ser atendido, nuevo tiempo de creacion: "+ nuevoPedido.getTiempoCreacion());
         } else {
             // Handle or log pedidos created in the past if necessary, 
             // for now, adding to current pedidos if it's somehow missed.
@@ -90,44 +125,6 @@ public class OperationService {
                 System.out.println("Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
             });
         // Potentially trigger re-planning
-    }
-
-    /**
-     * Advances the operational context time by one minute.
-     * This would typically involve processing events for the new minute.
-     */
-    public void avanzarTiempoOperacionalUnMinuto() {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-
-        LocalDateTime nuevoTiempo = operationalContext.getCurrentTime().plusMinutes(1);
-        operationalContext.setCurrentTime(nuevoTiempo);
-
-        // Activate new pedidos for the current time
-        List<Pedido> nuevosPedidosParaEsteMinuto = operationalContext.getPedidosPorTiempo().remove(nuevoTiempo);
-        if (nuevosPedidosParaEsteMinuto != null && !nuevosPedidosParaEsteMinuto.isEmpty()) {
-            operationalContext.getPedidos().addAll(nuevosPedidosParaEsteMinuto);
-            System.out.println("Activated " + nuevosPedidosParaEsteMinuto.size() + " new pedidos at time " + nuevoTiempo);
-            // Emitir eventos ORDER_CREATED para cada pedido activado
-            for (Pedido pedido : nuevosPedidosParaEsteMinuto) {
-                PedidoDTO dto = MapperUtil.toPedidoDTO(pedido);
-                EventDTO pedidoEvent = EventDTO.of(EventType.ORDER_CREATED, dto);
-                eventPublisher.publicarEventoOperacion(pedidoEvent);
-            }
-        }
-
-        // Advance each truck in the operational context
-        // This is a simplified advancement; real logic might be in CamionEstado or a dedicated planner
-        for (CamionEstado camion : operationalContext.getCamiones()) {
-            if (!operationalContext.getCamionesInhabilitados().contains(camion.getPlantilla().getId())) {
-                // camion.avanzarPasoEnRutaActual(); // Assuming CamionEstado has this method
-                // For now, just a placeholder action or logging
-                // System.out.println("Advancing truck " + camion.getPlantilla().getId() + " in operational context.");
-            }
-        }
-        // Potentially trigger other time-dependent events or re-planning
     }
 
     public List<CamionDTO> getListaCamionesOperacionalesDTO() {
