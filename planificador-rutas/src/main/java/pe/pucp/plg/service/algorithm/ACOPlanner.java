@@ -430,8 +430,6 @@ public class ACOPlanner {
                     estado.getTanques().get(0).getCapacidadTotal());
         }
 
-        // 2) Disparar eventos de entrega programados para este minuto
-        triggerScheduledDeliveries(tiempoActual);
         // 4) Avanzar o procesar retorno y entregas por separado
         for (CamionDinamico c : estado.getCamiones()) {
             // 0) Está descargando/recargando => no avanza
@@ -475,6 +473,9 @@ public class ACOPlanner {
 
             // 4) AVAILABLE con ruta vacía → simplemente espera asignación
         }
+        // 2) Disparar eventos de entrega programados para este minuto
+        triggerScheduledDeliveries(tiempoActual);
+
 
         // 5) Incorporar nuevos pedidos que llegan en este minuto
         List<Pedido> nuevos = estado.getPedidosPorTiempo().remove(tiempoActual);
@@ -702,26 +703,17 @@ public class ACOPlanner {
                         }
 
                         // tiempo de llegada al desvío
-                        int ttDesvio = (int)Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
-                        int tLlegada = tiempoActual + ttDesvio;
-
+                        int pasos      = caminoDesvio.size();
+                        int tLlegada   = tiempoActual + pasos;         // antiguo
+                        tLlegada       = tLlegada + 1;
                         // mantengo camión en DELIVERING y bloqueado hasta fin de servicio
                         mejor.setStatus(CamionDinamico.TruckStatus.DELIVERING);
                         mejor.setLibreEn(tLlegada + TIEMPO_SERVICIO);
 
-                        // reconstruyo la ruta combinada
-                        Pedido siguiente = mejor.getRutaPendiente().get(0);
-                        List<Point> caminoPost = buildManhattanPath(
-                                p.getX(), p.getY(),
-                                siguiente.getX(), siguiente.getY(),
-                                tLlegada + TIEMPO_SERVICIO
-                        );
-                        List<Point> nuevaRuta = new ArrayList<>(caminoDesvio);
-                        if (caminoPost != null) nuevaRuta.addAll(caminoPost);
                         mejor.getRutaActual().clear();
-                        mejor.setRutaActual(nuevaRuta);
+                        mejor.setRutaActual(new ArrayList<>(caminoDesvio));
                         mejor.setPasoActual(0);
-                        mejor.getHistory().addAll(nuevaRuta);
+                        mejor.getHistory().addAll(caminoDesvio);
 
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionDinamico cam = mejor;
@@ -882,7 +874,7 @@ public class ACOPlanner {
         int destY = mejorT != null ? mejorT.getPosY() : dy;
         if (mejorT != null) {
             mejorT.setDisponible(mejorT.getDisponible() - falta);
-            c.setDisponible(c.getCapacidad()); // <-- recarga tras tanque
+            //c.setDisponible(c.getCapacidad()); // <-- recarga tras tanque
             System.out.printf(
                     "🔁 t+%d: Tanque (%d,%d) reservado %.1fm³ → ahora %.1f m³%n",
                     tiempoActual, mejorT.getPosX(), mejorT.getPosY(),
@@ -912,7 +904,7 @@ public class ACOPlanner {
     // ------------------------------------------------------------
     private boolean esDesvioValido(CamionDinamico c, Pedido p, int tiempoActual) {
         // 1) Capacidad real remanente = total – lo ya en rutaPendiente
-        double capacidadTotal = c.getCapacidad();
+        double capacidadTotal = c.getDisponible();
         double volumenEnRuta = c.getRutaPendiente().stream()
                 .mapToDouble(Pedido::getVolumen)
                 .sum();
