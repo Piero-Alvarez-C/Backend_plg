@@ -75,9 +75,8 @@ public class OrchestratorService {
 
         // AVANZAR EL TIEMPO
         LocalDateTime tiempoActual = contexto.getCurrentTime() != null ?
-                contexto.getCurrentTime().plusMinutes(1) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+                contexto.getCurrentTime().plusMinutes(1).withSecond(0).withNano(0) : LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
         contexto.setCurrentTime(tiempoActual);
-        System.out.println("Cambia el tiempo actual de las operaciones a : " + tiempoActual);
 
         
         // Actualizar los bloqueos activos en este tiempo
@@ -172,6 +171,10 @@ public class OrchestratorService {
         }
         
         // 5. Incorporar nuevos pedidos que llegan en este tiempo
+        if ("operational".equals(simulationId)) {
+            System.out.println("Cantidad de pedidos del contexto operacional: "+ contexto.getPedidosPorTiempo().size());
+            System.out.println("Cambia el tiempo actual de las operaciones a : " + tiempoActual);
+        }
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
             nuevos = Collections.emptyList();
@@ -183,7 +186,7 @@ public class OrchestratorService {
                 //eventPublisher.publicarEventoSimulacion(simulationId, eventoPedido);
             }
         }
-        System.out.println("Cantidad de pedido a inyectar: " + nuevos.size());        
+        System.out.println("Cantidad de pedidos a inyectar: " + nuevos.size());
         
         // 5.a Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
         double capacidadMaxCamion = contexto.getCamiones().stream()

@@ -45,7 +45,6 @@ public class OperationService {
     public void ejecutarOperacionesDiaADia() {
         try {
             orchestratorService.stepOneMinute("operational");
-            System.out.println("Ejecutando operaciones día a día en: " + LocalDateTime.now());
         } catch (Exception e) {
             System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
             e.printStackTrace();

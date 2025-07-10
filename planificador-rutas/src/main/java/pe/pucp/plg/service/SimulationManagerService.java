@@ -9,15 +9,12 @@ import pe.pucp.plg.model.control.SimulationControlState;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
+import pe.pucp.plg.util.ResourceLoader;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.NavigableMap;
-import java.util.TreeMap;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,15 +51,28 @@ public class SimulationManagerService {
         // 2. Initialize Tanques
         this.operationalContext.setTanques(tanqueService.inicializarTanques());
 
-        // 3. Initialize Pedidos from PedidoRepository
+        // 3. Initialize Pedidos from ResourceLoader
         LocalDateTime startTime = LocalDateTime.now();  // Fecha y hora actual precisa al momento de iniciar
+        List<Pedido> todosLosPedidos = ResourceLoader.cargarPedidosParaFecha(LocalDate.from(startTime));
+        System.out.println("Cantidad de pedidos totales operacional: " + todosLosPedidos.size());
 
-        List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
 
         // Filtrar pedidos que tengan tiempoCreacion igual o posterior a startTime (incluyendo hora)
         NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
                 .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
                 .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
+        System.out.println("Total de pedidos para completar el  día: " + pedidosPorTiempo.size());
+        for (Map.Entry<LocalDateTime, List<Pedido>> entry : pedidosPorTiempo.entrySet()) {
+            LocalDateTime fechaHora = entry.getKey();
+            List<Pedido> pedidos = entry.getValue();
+
+            System.out.println("Fecha y hora: " + fechaHora);
+            System.out.println("Pedidos:");
+
+            for (Pedido p : pedidos) {
+                System.out.println("\tPedido en ubicación (" + p.getX() + ", " + p.getY() + "), volumen: " + p.getVolumen());
+            }
+        }
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
 
         // Pedidos exactamente en startTime (mismo instante)
@@ -71,8 +81,8 @@ public class SimulationManagerService {
                 .collect(Collectors.toList());
         this.operationalContext.setPedidos(new ArrayList<>(initialPedidos));
 
-        // 4. Initialize Bloqueos from BloqueoRepository
-        this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
+        // 4. Initialize Bloqueos from ResourceLoader
+        this.operationalContext.setBloqueos(ResourceLoader.cargarBloqueosParaFecha(LocalDate.from(startTime)));
 
         // 5. Set initial simulation time for operational context
         this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
