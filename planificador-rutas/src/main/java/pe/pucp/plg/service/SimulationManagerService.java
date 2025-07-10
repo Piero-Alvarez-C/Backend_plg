@@ -176,4 +176,11 @@ public class SimulationManagerService {
         }
     }
 
+    public String isAnySimulationActive() {
+        if( activeSimulationContext != null && activeSimulationId != null ) {
+            return activeSimulationId;
+        }
+        return String.valueOf(false);
+    }
+
 }
