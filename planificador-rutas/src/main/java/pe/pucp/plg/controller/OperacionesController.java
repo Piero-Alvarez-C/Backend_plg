@@ -1,18 +1,13 @@
 package pe.pucp.plg.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import pe.pucp.plg.dto.EventDTO;
-import pe.pucp.plg.model.context.ExecutionContext;
+import pe.pucp.plg.dto.SimulacionSnapshotDTO;
 import pe.pucp.plg.service.OperationService;
-import pe.pucp.plg.service.ArchivoService;
-
-import java.util.logging.Logger;
 
 @RestController
-@RequestMapping("/api/v1/operaciones")
+@RequestMapping("/api/operaciones")
 public class OperacionesController {
 
     private final OperationService operacionesService;
@@ -31,7 +26,7 @@ public class OperacionesController {
 
     // Endpoint para obtener el snapshot/estado actual del contexto operativo
     @GetMapping("/snapshot")
-    public ResponseEntity<ExecutionContext> obtenerSnapshot() {
+    public ResponseEntity<SimulacionSnapshotDTO> obtenerSnapshot() {
         return ResponseEntity.ok(operacionesService.getSnapshot());
     }
 }

@@ -9,13 +9,14 @@ import org.springframework.web.socket.config.annotation.*;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
+    public void configureMessageBroker(@SuppressWarnings("null") MessageBrokerRegistry config) {
         // Prefijo para los mensajes salientes (cliente se suscribe a /topic/...)
         config.enableSimpleBroker("/topic");
         // Prefijo para los mensajes entrantes desde cliente al servidor (no lo usaremos de momento)
         config.setApplicationDestinationPrefixes("/app");
     }
 
+    @SuppressWarnings("null")
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Punto de conexión del frontend al WebSocket

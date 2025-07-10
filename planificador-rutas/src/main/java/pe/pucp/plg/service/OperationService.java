@@ -9,8 +9,6 @@ import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 
-import java.time.LocalDateTime;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors; // Added
@@ -45,7 +43,7 @@ public class OperationService {
     public void ejecutarOperacionesDiaADia() {
         try {
             System.out.println("======================================OPERACIONES===================================================");
-            orchestratorService.stepOneMinute("operational");
+            orchestratorService.stepOneMinute(simulationManagerService.getOperationalContext(), "operational");
         } catch (Exception e) {
             System.err.println("Error al ejecutar paso de operaciones día a día: " + e.getMessage());
             e.printStackTrace();
@@ -58,8 +56,8 @@ public class OperationService {
     }
 
     // Método para obtener el contexto operativo actual
-    public ExecutionContext getSnapshot() {
-        return simulationManagerService.getOperationalContext();
+    public SimulacionSnapshotDTO getSnapshot() {
+        return MapperUtil.toSnapshotDTO(simulationManagerService.getOperationalContext());
     }
     /**
      * Registers a new order into the operational context.
