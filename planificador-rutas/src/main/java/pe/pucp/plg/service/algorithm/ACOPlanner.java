@@ -685,8 +685,8 @@ public class ACOPlanner {
                         );
                         int tt       = (int)Math.ceil(ruta.size() * (60.0 / 50.0));
                         int tLlegada = tiempoActual + tt;
-                        System.out.printf(">>> DEBUG SCHEDULING-AVAIL: pedido #%d a t+%d%n",
-                                p.getId(), tLlegada);
+                        //System.out.printf(">>> DEBUG SCHEDULING-AVAIL: pedido #%d a t+%d%n",
+                        //        p.getId(), tLlegada);
                         mejor.setStatus(CamionDinamico.TruckStatus.DELIVERING);
                         mejor.setLibreEn(tLlegada + TIEMPO_SERVICIO);
                         mejor.setRutaActual(ruta);
@@ -722,8 +722,7 @@ public class ACOPlanner {
                         mejor.setStatus(CamionDinamico.TruckStatus.DELIVERING);
                         mejor.setLibreEn(tLlegada + TIEMPO_SERVICIO);
 
-                        System.out.printf(">>> DEBUG SCHEDULING-PARCIAL: pedido #%d a t+%d%n",
-                                p.getId(), tLlegada);
+                        //System.out.printf(">>> DEBUG SCHEDULING-PARCIAL: pedido #%d a t+%d%n",p.getId(), tLlegada);
 
                         mejor.getRutaActual().clear();
                         mejor.setRutaActual(new ArrayList<>(caminoDesvio));
@@ -776,14 +775,14 @@ public class ACOPlanner {
     }
     // 2) Disparar eventos de entrega programados para este minuto
     private void triggerScheduledDeliveries(int tiempoActual) {
-        System.out.printf(">>> DEBUG t+%d: eventosEntrega = %s%n",
-                tiempoActual,
-                estado.getEventosEntrega().stream()
-                        .map(ev -> String.format("%s@%d",
-                                ev.pedido==null ? "RET" : "#"+ev.pedido.getId(),
-                                ev.time))
-                        .collect(Collectors.toList())
-        );
+        //System.out.printf(">>> DEBUG t+%d: eventosEntrega = %s%n",
+        //        tiempoActual,
+        //        estado.getEventosEntrega().stream()
+        //                .map(ev -> String.format("%s@%d",
+        //                        ev.pedido==null ? "RET" : "#"+ev.pedido.getId(),
+        //                        ev.time))
+        //                .collect(Collectors.toList())
+        //);
 
         Iterator<EntregaEvent> it = estado.getEventosEntrega().iterator();
         List<EntregaEvent> nuevosEventos = new ArrayList<>();
