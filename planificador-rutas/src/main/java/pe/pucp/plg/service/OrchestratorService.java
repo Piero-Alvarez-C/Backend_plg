@@ -77,7 +77,7 @@ public class OrchestratorService {
 
         // 1) Recarga de tanques intermedios cada vez que currentTime % 1440 == 0 (inicio de día)
         if (esMediaNoche) {
-            System.out.println("⛽ Recarga diaria de tanques en " + tiempoActual);
+            //System.out.println("⛽ Recarga diaria de tanques en " + tiempoActual);
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
             }
@@ -85,18 +85,18 @@ public class OrchestratorService {
             // Determinar qué día estamos y cargar datos para ese día
             LocalDate fechaActual = tiempoActual.toLocalDate();
             long diaActual = fechaActual.toEpochDay() - contexto.getFechaInicio().toEpochDay() + 1;
-            System.out.println("📅 Día " + diaActual + " de la simulación, cargando nuevos datos...");
+            //System.out.println("📅 Día " + diaActual + " de la simulación, cargando nuevos datos...");
             
             // Solo cargamos datos nuevos si estamos dentro del período de simulación
             if (diaActual <= contexto.getDuracionDias()) {
-                System.out.println("📅 Cargando datos para el día: " + fechaActual);
+                //System.out.println("📅 Cargando datos para el día: " + fechaActual);
                 
                 // Cargar pedidos y bloqueos para este día
                 List<Pedido> nuevoPedidos = ResourceLoader.cargarPedidosParaFecha(fechaActual);
                 List<Bloqueo> nuevoBloqueos = ResourceLoader.cargarBloqueosParaFecha(fechaActual);
 
-                System.out.printf("🔄 Día %d: Hay %d nuevos pedidos y %d bloqueos%n", 
-                        diaActual, nuevoPedidos.size(), nuevoBloqueos.size());
+                /*System.out.printf("🔄 Día %d: Hay %d nuevos pedidos y %d bloqueos%n", 
+                        diaActual, nuevoPedidos.size(), nuevoBloqueos.size());*/
 
                 // Añadir los nuevos pedidos al mapa de pedidos por tiempo
                 for (Pedido p : nuevoPedidos) {
@@ -114,8 +114,8 @@ public class OrchestratorService {
                     contexto.addBloqueo(b);
                 }
                 
-                System.out.printf("🔄 Día %d: Cargados %d nuevos pedidos y %d bloqueos%n", 
-                        diaActual, contexto.getPedidos().size(), contexto.getBloqueos().size());
+                /*System.out.printf("🔄 Día %d: Cargados %d nuevos pedidos y %d bloqueos%n", 
+                        diaActual, contexto.getPedidos().size(), contexto.getBloqueos().size());*/
                 
                 // Si hay nuevos datos, replanificar
                 if (!nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty()) {
@@ -142,8 +142,8 @@ public class OrchestratorService {
         for (CamionEstado c : contexto.getCamiones()) {
             // 0) Está descargando/recargando => no avanza
             if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE){
-                System.out.printf("⏱️ t+%d: Camión %s en servicio, libre en t+%d%n",
-                        tiempoActual, c.getPlantilla().getId(), c.getTiempoLibre());
+                /*System.out.printf("⏱️ t+%d: Camión %s en servicio, libre en t+%d%n",
+                        tiempoActual, c.getPlantilla().getId(), c.getTiempoLibre());*/
                 continue;
             }
 
@@ -151,16 +151,16 @@ public class OrchestratorService {
             if (c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                 if (c.tienePasosPendientes()) {
                     c.avanzarUnPaso();
-                    System.out.printf("t+%d: → Camión %s avanza (retorno) a (%d,%d)%n",tiempoActual,
-                            c.getPlantilla().getId(), c.getX(), c.getY());
+                    /*System.out.printf("t+%d: → Camión %s avanza (retorno) a (%d,%d)%n",tiempoActual,
+                            c.getPlantilla().getId(), c.getX(), c.getY());*/
                 } else {
                     // llegó al depósito: programa recarga 15'
                     c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
                     c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());            // <-- **aquí** recargas el camión
                     c.setTiempoLibre(tiempoActual.plusMinutes(TIEMPO_SERVICIO));
                     c.getPedidosCargados().clear();
-                    System.out.printf("🔄 t+%d: Camión %s llegó a planta, recargando hasta t+%d%n",
-                            tiempoActual, c.getPlantilla().getId(), c.getTiempoLibre());
+                    /*System.out.printf("🔄 t+%d: Camión %s llegó a planta, recargando hasta t+%d%n",
+                            tiempoActual, c.getPlantilla().getId(), c.getTiempoLibre());*/
                 }
                 continue;
             }
@@ -170,11 +170,11 @@ public class OrchestratorService {
                     && c.tienePasosPendientes()) {
                 c.avanzarUnPaso();
                 if (c.getPedidoDesvio() != null) {
-                    System.out.printf("t+%d:→ Camión %s avanza (desvío) a (%d,%d)%n", tiempoActual,
-                            c.getPlantilla().getId(), c.getX(), c.getY());
+                    /*System.out.printf("t+%d:→ Camión %s avanza (desvío) a (%d,%d)%n", tiempoActual,
+                            c.getPlantilla().getId(), c.getX(), c.getY());*/
                 } else {
-                    System.out.printf("t+%d:→ Camión %s avanza (entrega) a (%d,%d)%n", tiempoActual,
-                            c.getPlantilla().getId(), c.getX(), c.getY());
+                    /*System.out.printf("t+%d:→ Camión %s avanza (entrega) a (%d,%d)%n", tiempoActual,
+                            c.getPlantilla().getId(), c.getX(), c.getY());*/
                 }
                 continue;
             }
@@ -226,10 +226,6 @@ public class OrchestratorService {
         // 5.b) Añadir realmente los pedidos (reemplazo de los nuevos originales)
         contexto.getPedidos().addAll(pedidosAInyectar);
 
-        for (Pedido p : pedidosAInyectar) {
-            System.out.printf("🆕 t+%d: Pedido #%d recibido (destino=(%d,%d), vol=%.1fm³, límite t+%d)%n",
-                    tiempoActual, p.getId(), p.getX(), p.getY(), p.getVolumen(), p.getTiempoLimite());
-        }
         if (!pedidosAInyectar.isEmpty()) replanificar = true;
         if (countReplan == INTERVALO_REPLAN) {
             replanificar = true;
@@ -248,8 +244,8 @@ public class OrchestratorService {
         while (itP.hasNext()) {
             Pedido p = itP.next();
             if (!p.isAtendido() && !p.isDescartado() && tiempoActual.isAfter(p.getTiempoLimite())) {
-                System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
-                        tiempoActual, p.getId());
+                /*System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
+                        tiempoActual, p.getId());*/
                 // Marca y elimina para no repetir el colapso
                 p.setDescartado(true);
                 itP.remove();
@@ -270,22 +266,22 @@ public class OrchestratorService {
             String key = turnoActual + "_" + mid;
             if (contexto.getAveriasAplicadas().contains(key)) continue;
             CamionEstado c = findCamion(mid, contexto);
-            if (c != null && c.getTiempoLibre().isBefore(tiempoActual)) {
+            if (c != null && c.getTiempoLibre() != null && !c.getTiempoLibre().isAfter(tiempoActual)) {
                 String tipo = averiasTurno.get(mid);
                 int penal = tipo.equals("T1") ? 30 : tipo.equals("T2") ? 60 : 90;
                 c.setTiempoLibre(tiempoActual.plusMinutes(penal));
                 contexto.getAveriasAplicadas().add(key);
                 contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
                 replanificar = true;
-                System.out.printf("🚨 t+%d: Camión %s sufre avería tipo %s, penal=%d%n",
-                        tiempoActual, c.getPlantilla().getId(), tipo, penal);
+                /*System.out.printf("🚨 t+%d: Camión %s sufre avería tipo %s, penal=%d%n",
+                        tiempoActual, c.getPlantilla().getId(), tipo, penal);*/
             }
         }
         // limpiar inhabilitados
         Iterator<String> itInh = contexto.getCamionesInhabilitados().iterator();
         while (itInh.hasNext()) {
             CamionEstado c = findCamion(itInh.next(), contexto);
-            if (c != null && c.getTiempoLibre().isBefore(tiempoActual)) {
+            if (c != null && c.getTiempoLibre() != null && !c.getTiempoLibre().isAfter(tiempoActual)) {
                 itInh.remove();
                 replanificar = true;
             }
@@ -293,8 +289,7 @@ public class OrchestratorService {
 
         // 8) Construir estado “ligero” de la flota disponible para ACO
         List<CamionEstado> flotaEstado = contexto.getCamiones().stream()
-                .filter(c -> c.getTiempoLibre().isBefore(tiempoActual) // está libre o en servicio
-                        && c.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE
+                .filter(c -> c.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE
                         && c.getPedidosCargados().isEmpty()            // no tiene entregas encoladas
                         && c.getPedidoDesvio() == null)               // no está en medio de un desvío
                 .map(c -> {
@@ -304,8 +299,8 @@ public class OrchestratorService {
                 .collect(Collectors.toList());
 
         if (replanificar && flotaEstado.isEmpty()) {
-            System.out.printf("⏲️ t+%d: Ningún camión disponible (ni en ventana) → replanificación pospuesta%n",
-                    tiempoActual);
+            /*System.out.printf("⏲️ t+%d: Ningún camión disponible (ni en ventana) → replanificación pospuesta%n",
+                    tiempoActual);*/
             replanificar = false;
         }
 
@@ -323,9 +318,9 @@ public class OrchestratorService {
         List<Pedido> candidatos = pendientes;
         // 10) Replanificación ACO si procede
         if (replanificar && !candidatos.isEmpty()) {
-            System.out.printf("⏲️ t+%d: Replanificando, candidatos=%s%n",
+            /*System.out.printf("⏲️ t+%d: Replanificando, candidatos=%s%n",
                     tiempoActual, candidatos.stream()
-                            .map(Pedido::getId).collect(Collectors.toList()));
+                            .map(Pedido::getId).collect(Collectors.toList()));*/
             // Si flotaEstado está vacío, salimos sin tocar nada
             if (flotaEstado.isEmpty()) {
                 return tiempoActual;
@@ -426,16 +421,16 @@ public class OrchestratorService {
                         contexto.getEventosEntrega()
                                 .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
 
-                        System.out.printf(
+                        /*System.out.printf(
                                 "🔀 t+%d: Pedido #%d insertado en %s, recalculando ruta a desvío + resto%n",
                                 tiempoActual, p.getId(), mejor.getPlantilla().getId()
-                        );
+                        );*/
                     }
 
-                    System.out.printf(
+                    /*System.out.printf(
                             "🔀 t+%d: Pedido #%d asignado a Camión %s (desvío)%n",
                             tiempoActual, p.getId(), mejor.getPlantilla().getId()
-                    );
+                    );*/
                 } else {
                     sinAsignar.add(p);
                 }
@@ -444,15 +439,15 @@ public class OrchestratorService {
 
             // C) El resto va al ACO habitual
             if (!sinAsignar.isEmpty()) {
-                System.out.printf("📦 ACO recibe pedidos sin asignar: %s%n",
-                        sinAsignar.stream().map(Pedido::getId).collect(Collectors.toList()));
+                /*System.out.printf("📦 ACO recibe pedidos sin asignar: %s%n",
+                        sinAsignar.stream().map(Pedido::getId).collect(Collectors.toList()));*/
                 sinAsignar.removeIf(p -> p.isProgramado() || p.isAtendido());
                 List<Ruta> rutas = acoPlanner.planificarRutas(sinAsignar, flotaEstado, tiempoActual, contexto);
-                System.out.printf("    → Rutas ACO para %s%n",
+                /*System.out.printf("    → Rutas ACO para %s%n",
                         rutas.stream()
                                 .flatMap(r -> r.getPedidoIds().stream())
                                 .map(i -> sinAsignar.get(i).getId())
-                                .collect(Collectors.toList()));
+                                .collect(Collectors.toList()));*/
 
                 aplicarRutas(tiempoActual, rutas, sinAsignar, contexto);
                 contexto.setRutas(rutas);
@@ -499,8 +494,8 @@ public class OrchestratorService {
                 camion.setStatus(CamionEstado.TruckStatus.UNAVAILABLE);
                 LocalDateTime finServicio = tiempoActual.plusMinutes(TIEMPO_SERVICIO);
                 camion.setTiempoLibre(finServicio);
-                System.out.printf("⏲️ t+%d: Camión %s inicia servicio de entrega, libre en t+%d%n",
-                        tiempoActual, camion.getPlantilla().getId(), finServicio);
+                /*System.out.printf("⏲️ t+%d: Camión %s inicia servicio de entrega, libre en t+%d%n",
+                        tiempoActual, camion.getPlantilla().getId(), finServicio);*/
 
                 // reagendar fin de servicio para este pedido
                 nuevosEventos.add(new EntregaEvent(finServicio, camion.getPlantilla().getId(), pedido));
@@ -514,9 +509,9 @@ public class OrchestratorService {
             pedido.setAtendido(true);
             camion.clearDesvio();                                      // limpia estado post-desvío
             camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
-            System.out.printf("✅ t+%d: Completando pedido %d por Camión %s en (%d,%d); cap: %.1f→%.1f m³%n",
+            /*System.out.printf("✅ t+%d: Completando pedido %d por Camión %s en (%d,%d); cap: %.1f→%.1f m³%n",
                     tiempoActual, pedido.getId(), camion.getPlantilla().getId(),
-                    pedido.getX(), pedido.getY(), antes, camion.getCapacidadDisponible());
+                    pedido.getX(), pedido.getY(), antes, camion.getCapacidadDisponible());*/
 
             // 4) Replanificar: ruta original o nuevo desvío
             if (pedido.equals(camion.getPedidoDesvio())) {
@@ -590,11 +585,11 @@ public class OrchestratorService {
         int destY = mejorT != null ? mejorT.getPosY() : dy;
         if (mejorT != null) {
             mejorT.setDisponible(mejorT.getDisponible() - falta);
-            System.out.printf(
+            /*System.out.printf(
                     "🔁 t+%d: Tanque (%d,%d) reservado %.1fm³ → ahora %.1f m³%n",
                     tiempoActual, mejorT.getPosX(), mejorT.getPosY(),
                     falta, mejorT.getDisponible()
-            );
+            );*/
         }
         c.setStatus(CamionEstado.TruckStatus.RETURNING);
 
@@ -603,10 +598,10 @@ public class OrchestratorService {
         c.setPasoActual(0);
         c.getHistory().addAll(camino);
 
-        System.out.printf(
+        /*System.out.printf(
                 "⏱️ t+%d: Camión %s inicia retorno a (%d,%d) dist=%d%n",
                 tiempoActual, c.getPlantilla().getId(), destX, destY, distMin
-        );
+        );*/
     }
 
     // ------------------------------------------------------------
@@ -715,10 +710,10 @@ public class OrchestratorService {
     private void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto) {
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
         if (rutas.isEmpty()) {
-            System.out.printf("⚠ t+%d: ACO no encontró ruta válida, aplicando asignación secuencial para %s%n",
+            /*System.out.printf("⚠ t+%d: ACO no encontró ruta válida, aplicando asignación secuencial para %s%n",
                     tiempoActual,
                     activos.stream().map(p -> "#" + p.getId()).collect(Collectors.joining(", "))
-            );
+            );*/
             // Fallback: para cada pedido pendiente, busca el camión disponible más cercano
             for (Pedido p : activos) {
                 CamionEstado mejor = null;
@@ -743,11 +738,11 @@ public class OrchestratorService {
                     int viaje = path.size();
 
                     contexto.getEventosEntrega().add(new EntregaEvent(tiempoActual.plusMinutes(viaje + TIEMPO_SERVICIO), mejor.getPlantilla().getId(), p));
-                    System.out.printf("🔀 t+%d: Fallback – Pedido #%d asignado a %s, ruta de %d pasos%n",
-                            tiempoActual, p.getId(), mejor.getPlantilla().getId(), viaje);
+                    /*System.out.printf("🔀 t+%d: Fallback – Pedido #%d asignado a %s, ruta de %d pasos%n",
+                            tiempoActual, p.getId(), mejor.getPlantilla().getId(), viaje);*/
                 } else {
-                    System.out.printf("❌ t+%d: No hay camión disponible para Pedido #%d%n",
-                            tiempoActual, p.getId());
+                    /*System.out.printf("❌ t+%d: No hay camión disponible para Pedido #%d%n",
+                            tiempoActual, p.getId());*/
                 }
             }
             return;
@@ -767,9 +762,9 @@ public class OrchestratorService {
                 disponible -= activos.get(idx).getVolumen();
             }
             if (!allFit) {
-                System.out.printf("⚠ t+%d: Ruta descartada para %s (no cabe volumen) → %s%n",
+                /*System.out.printf("⚠ t+%d: Ruta descartada para %s (no cabe volumen) → %s%n",
                         tiempoActual, real.getPlantilla().getId(),
-                        r.getPedidoIds().stream().map(i -> activos.get(i).getId()).collect(Collectors.toList()));
+                        r.getPedidoIds().stream().map(i -> activos.get(i).getId()).collect(Collectors.toList()));*/
                 itR.remove();
             }
         }
@@ -800,8 +795,8 @@ public class OrchestratorService {
                     if (p.isProgramado() || camion.getPedidosCargados().contains(p)) continue;
                     // — nuevo check de capacidad —
                     if (p.getVolumen() > camion.getCapacidadDisponible()) {
-                        System.out.printf("⚠ t+%d: Camión %s NO tiene capacidad para Pedido #%d (restan=%.1f m³)%n",
-                                tiempoActual, camion.getPlantilla().getId(), p.getId(), camion.getCapacidadDisponible());
+                        /*System.out.printf("⚠ t+%d: Camión %s NO tiene capacidad para Pedido #%d (restan=%.1f m³)%n",
+                                tiempoActual, camion.getPlantilla().getId(), p.getId(), camion.getCapacidadDisponible());*/
                         continue;
                     }
                     if (!esDesvioValido(camion, p, tiempoActual, contexto)) continue;
@@ -833,8 +828,8 @@ public class OrchestratorService {
                             );
                         // ────────────────────────────────────────────────────────────────────────────
                         p.setProgramado(true);
-                        System.out.printf("🔀 t+%d: Pedido #%d asignado a Camión %s (desvío), cap restante=%.1f m³%n",
-                                tiempoActual, p.getId(), camion.getPlantilla().getId(), camion.getCapacidadDisponible());
+                        /*System.out.printf("🔀 t+%d: Pedido #%d asignado a Camión %s (desvío), cap restante=%.1f m³%n",
+                                tiempoActual, p.getId(), camion.getPlantilla().getId(), camion.getCapacidadDisponible());*/
                     }
                     break;
                 }
@@ -1044,8 +1039,8 @@ public class OrchestratorService {
                 b.setLastKnownState(Bloqueo.Estado.ACTIVO);
             
                 
-                System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
-                        tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
+                /*System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
+                        tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());*/
             }
         }
         
@@ -1060,8 +1055,8 @@ public class OrchestratorService {
                     // Actualizar estado
                     b.setLastKnownState(Bloqueo.Estado.TERMINADO);
                     
-                    System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
-                            tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());
+                    /*System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
+                            tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());*/
                 }
             }
         }

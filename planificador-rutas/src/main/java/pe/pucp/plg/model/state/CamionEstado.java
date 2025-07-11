@@ -83,7 +83,7 @@ public class CamionEstado {
         this.status = original.status;
         this.tiempoLibre = original.tiempoLibre;
     }
-
+    
     // Getters
     public CamionTemplate getPlantilla() { return plantilla; }
     public int getX() { return x; }
