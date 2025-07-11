@@ -20,7 +20,7 @@ public class MapperUtil {
         dto.setId(camion.getPlantilla().getId()); 
         dto.setX(camion.getX()); // Corrected
         dto.setY(camion.getY()); // Corrected
-        dto.setDisponible(camion.getPlantilla().getCapacidadCarga()); 
+        dto.setDisponible(camion.getCapacidadDisponible()); 
         dto.setCombustibleDisponible(camion.getCombustibleActual()); // Corrected
         dto.setStatus(camion.getStatus().name());
         // dto.setConsumoAcumulado(camion.getConsumoAcumulado()); // Getter does not exist, commented out for now

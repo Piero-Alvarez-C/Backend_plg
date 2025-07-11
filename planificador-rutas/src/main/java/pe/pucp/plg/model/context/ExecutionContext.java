@@ -11,8 +11,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.NavigableMap;
-import java.util.TreeMap;
 
 public class ExecutionContext {
 
@@ -30,10 +28,10 @@ public class ExecutionContext {
     private List<Pedido> pedidos = new ArrayList<>();
 
     // 4) Bloqueos cargados
-    private List<Bloqueo> bloqueos = new ArrayList<>();
+    private NavigableMap<LocalDateTime, List<Bloqueo>> bloqueosPorTiempo = new TreeMap<>();
 
     // 5) Eventos de entrega futuros (se programan con tiempo de disparo)
-    private List<EntregaEvent> eventosEntrega = new ArrayList<>();
+    private Queue<EntregaEvent> eventosEntrega = new PriorityQueue<>(Comparator.comparing(ev -> ev.time));
 
     // 6) Mapa: tiempo → lista de pedidos que llegan ese tiempo
     private NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = new TreeMap<>();
@@ -70,7 +68,19 @@ public class ExecutionContext {
 
     private List<Bloqueo> bloqueosActivos = new ArrayList<>();
 
+    private List<Bloqueo> bloqueosPorDia = new ArrayList<>();
+
+    // PARA EL COLAPSO
+
+    private boolean ignorarColapso = false;
+
     // ————— GETTERS y SETTERS (tal como los tienes) —————
+
+    public NavigableMap<LocalDateTime, List<Bloqueo>> getBloqueosPorTiempo() { return bloqueosPorTiempo; }
+    public void setBloqueosPorTiempo(NavigableMap<LocalDateTime, List<Bloqueo>> bloqueosPorTiempo) { this.bloqueosPorTiempo = bloqueosPorTiempo; }
+
+    public List<Bloqueo> getBloqueosPorDia() { return bloqueosPorDia; }
+    public void setBloqueosPorDia(List<Bloqueo> bloqueosPorDia) { this.bloqueosPorDia = bloqueosPorDia; }
 
     public List<CamionEstado> getCamiones() { return camiones; }
     public void setCamiones(List<CamionEstado> camiones) { this.camiones = camiones; }
@@ -81,31 +91,8 @@ public class ExecutionContext {
     public List<Pedido> getPedidos() { return pedidos; }
     public void setPedidos(List<Pedido> pedidos) { this.pedidos = pedidos; }
 
-    public List<Bloqueo> getBloqueos() { return bloqueos; }
-    public void addBloqueo(Bloqueo bloqueo) {
-        if (bloqueo == null) {
-            System.out.println("Null bloqueo, no se añadirá.");
-            return; // Skip null bloqueos
-        }
-        
-        if (bloqueos == null) {
-            bloqueos = new ArrayList<>();
-        }
-        
-        try {
-            bloqueos.add(bloqueo);
-        } catch (Exception e) {
-            // If there's any issue, create a new list and add it
-            System.err.println("Error adding bloqueo, creating new list: " + e.getMessage());
-            List<Bloqueo> newList = new ArrayList<>(bloqueos);
-            newList.add(bloqueo);
-            bloqueos = newList;
-        }
-    }
-    public void setBloqueos(List<Bloqueo> bloqueos) { this.bloqueos = bloqueos; }
-
-    public List<EntregaEvent> getEventosEntrega() { return eventosEntrega; }
-    public void setEventosEntrega(List<EntregaEvent> eventosEntrega) { this.eventosEntrega = eventosEntrega; }
+    public Queue<EntregaEvent> getEventosEntrega() { return eventosEntrega; }
+    public void setEventosEntrega(Queue<EntregaEvent> eventosEntrega) { this.eventosEntrega = eventosEntrega; }
 
     public NavigableMap<LocalDateTime, List<Pedido>> getPedidosPorTiempo() { return pedidosPorTiempo; }
     public void setPedidosPorTiempo(NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo) { this.pedidosPorTiempo = pedidosPorTiempo; }
@@ -142,6 +129,9 @@ public class ExecutionContext {
     
     public int getDuracionDias() { return duracionDias; }
     public void setDuracionDias(int duracionDias) { this.duracionDias = duracionDias; }
+
+    public boolean isIgnorarColapso() { return ignorarColapso; }
+    public void setIgnorarColapso(boolean ignorarColapso) { this.ignorarColapso = ignorarColapso; }
 
     public TanqueDinamico obtenerTanquePorPosicion(int x, int y) {
         return tanques.stream()

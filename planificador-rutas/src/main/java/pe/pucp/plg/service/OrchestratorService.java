@@ -81,6 +81,8 @@ public class OrchestratorService {
             for (TanqueDinamico tq : contexto.getTanques()) {
                 tq.setDisponible(tq.getCapacidadTotal());
             }
+
+            contexto.getBloqueosPorDia().removeIf(b -> b.getEndTime().isBefore(tiempoActual));
             
             // Determinar qué día estamos y cargar datos para ese día
             LocalDate fechaActual = tiempoActual.toLocalDate();
@@ -105,13 +107,8 @@ public class OrchestratorService {
                 
                 // Añadir los nuevos bloqueos
                 for (Bloqueo b : nuevoBloqueos) {
-                    System.out.printf("🔒 Nuevo bloqueo: %s desde %s hasta %s con nodos: ", 
-                            b.getDescription(), b.getStartTime(), b.getEndTime());
-                    for(Point p : b.getNodes()) {
-                        System.out.printf("(%d,%d) ", p.x, p.y);
-                    }
-                    System.out.printf("%n");
-                    contexto.addBloqueo(b);
+                    contexto.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+                    contexto.getBloqueosPorDia().add(b);
                 }
                 
                 /*System.out.printf("🔄 Día %d: Cargados %d nuevos pedidos y %d bloqueos%n", 
@@ -156,7 +153,8 @@ public class OrchestratorService {
                 } else {
                     // llegó al depósito: programa recarga 15'
                     c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
-                    c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());            // <-- **aquí** recargas el camión
+                    c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
+                    c.setCombustibleDisponible(c.getPlantilla().getCapacidadCombustible()); 
                     c.setTiempoLibre(tiempoActual.plusMinutes(TIEMPO_SERVICIO));
                     c.getPedidosCargados().clear();
                     /*System.out.printf("🔄 t+%d: Camión %s llegó a planta, recargando hasta t+%d%n",
@@ -229,6 +227,7 @@ public class OrchestratorService {
         if (!pedidosAInyectar.isEmpty()) replanificar = true;
         if (countReplan == INTERVALO_REPLAN) {
             replanificar = true;
+            countReplan = 0;
         }
 
         // (B) pedidos próximos a vencer: umbral en minutos
@@ -241,6 +240,7 @@ public class OrchestratorService {
         // ----------------------------------------------
         // 6) Comprobar colapso: pedidos vencidos
         Iterator<Pedido> itP = contexto.getPedidos().iterator();
+        boolean haColapsado = false;
         while (itP.hasNext()) {
             Pedido p = itP.next();
             if (!p.isAtendido() && !p.isDescartado() && tiempoActual.isAfter(p.getTiempoLimite())) {
@@ -249,7 +249,16 @@ public class OrchestratorService {
                 // Marca y elimina para no repetir el colapso
                 p.setDescartado(true);
                 itP.remove();
+                haColapsado = true;
             }
+        }
+
+        // COLAPSO
+        if(haColapsado && !contexto.isIgnorarColapso()) {
+            // Si ha colapsado y no se ignora, destruir la simulacion
+            System.out.printf("💥 Colapso detectado en t+%d, finalizando simulación%n", tiempoActual);
+            eventPublisher.publicarEventoSimulacion(simulationId, EventDTO.of(EventType.SIMULATION_COLLAPSED, null));
+            return null;
         }
 
         // 7) Averías por turno (T1, T2, T3)
@@ -305,12 +314,6 @@ public class OrchestratorService {
         }
 
         // 9) Determinar candidatos a replanificar
-        Map<Pedido, LocalDateTime> entregaActual = new HashMap<>();
-        for (EntregaEvent ev : new ArrayList<>(contexto.getEventosEntrega())) {
-            if (ev.getPedido() != null) {
-                entregaActual.put(ev.getPedido(), ev.time);
-            }
-        }
         List<Pedido> pendientes = contexto.getPedidos().stream()
                 .filter(p -> !p.isAtendido() && !p.isDescartado() && !p.isProgramado() && p.getTiempoCreacion().isBefore(tiempoActual))
                 .collect(Collectors.toList());
@@ -329,7 +332,10 @@ public class OrchestratorService {
             // A) cancelar y desprogramar — sólo si hay camiones
             Set<Integer> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
             contexto.getEventosEntrega().removeIf(ev -> ev.getPedido()!=null && ids.contains(ev.getPedido().getId()));
-            candidatos.forEach(p -> p.setProgramado(false));
+            candidatos.forEach(p -> {
+                p.setProgramado(false);
+                p.setHoraEntregaProgramada(null);
+                });
 
             // B) Desvío local con búsqueda del mejor camión
             List<Pedido> sinAsignar = new ArrayList<>();
@@ -461,19 +467,19 @@ public class OrchestratorService {
     }
     // 2) Disparar eventos de entrega programados para este minuto
     private void triggerScheduledDeliveries(LocalDateTime tiempoActual, ExecutionContext contexto) {
-        Iterator<EntregaEvent> it = contexto.getEventosEntrega().iterator();
         List<EntregaEvent> nuevosEventos = new ArrayList<>();
 
-        while (it.hasNext()) {
-            EntregaEvent ev = it.next();
+    // Mientras haya eventos en la cola Y el siguiente evento sea para AHORA
+        while (!contexto.getEventosEntrega().isEmpty() && 
+            contexto.getEventosEntrega().peek().time.equals(tiempoActual)) {
+
+            // Saca el evento de la cola
+            EntregaEvent ev = contexto.getEventosEntrega().poll();
             
             // Compara el valor del tiempo, no la referencia del objeto
             if (!ev.time.equals(tiempoActual)) {
                 continue;
             }
-
-            // Si el evento se procesa, se elimina de la lista actual
-            it.remove();
 
             CamionEstado camion = findCamion(ev.getCamionId(), contexto);
             Pedido pedido = ev.getPedido();
@@ -504,6 +510,8 @@ public class OrchestratorService {
                 double antes = camion.getCapacidadDisponible();
                 camion.setCapacidadDisponible(antes - pedido.getVolumen());
                 pedido.setAtendido(true); 
+                // Eliminar pedido de la lista de pedidos
+                contexto.getPedidos().remove(pedido);
                 camion.setStatus(CamionEstado.TruckStatus.AVAILABLE); // Vuelve a estar disponible
                 
                 camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
@@ -726,6 +734,7 @@ public class OrchestratorService {
                     int viaje = path.size();
 
                     contexto.getEventosEntrega().add(new EntregaEvent(tiempoActual.plusMinutes(viaje + TIEMPO_SERVICIO), mejor.getPlantilla().getId(), p));
+                    p.setHoraEntregaProgramada(tiempoActual.plusMinutes(viaje + TIEMPO_SERVICIO));
                     /*System.out.printf("🔀 t+%d: Fallback – Pedido #%d asignado a %s, ruta de %d pasos%n",
                             tiempoActual, p.getId(), mejor.getPlantilla().getId(), viaje);*/
                 } else {
@@ -814,6 +823,7 @@ public class OrchestratorService {
                         contexto.getEventosEntrega().add(
                             new EntregaEvent(finServicio, camion.getPlantilla().getId(), p)  // p = pedidoDesvio
                             );
+                        p.setHoraEntregaProgramada(finServicio);
                         // ────────────────────────────────────────────────────────────────────────────
                         p.setProgramado(true);
                         /*System.out.printf("🔀 t+%d: Pedido #%d asignado a Camión %s (desvío), cap restante=%.1f m³%n",
@@ -855,6 +865,7 @@ public class OrchestratorService {
                         int pasos = buildManhattanPath(cx, cy, p.getX(), p.getY(), t, contexto).size();
                         t = t.plusMinutes(pasos + TIEMPO_SERVICIO);
                         contexto.getEventosEntrega().add(new EntregaEvent(t, camion.getPlantilla().getId(), p));
+                        p.setHoraEntregaProgramada(t);
                         cx = p.getX();
                         cy = p.getY();
                     }
@@ -884,16 +895,13 @@ public class OrchestratorService {
     }
 
     private boolean isBlockedMove(int x, int y, LocalDateTime t, ExecutionContext estado) {
-        for (Bloqueo b : estado.getBloqueos()) {
-            // 1) Solo bloqueos activos en este minuto
-            if (!b.isActiveAt(t)) continue;
-            // 2) Si el punto "next" está en ese segmento bloqueado, lo bloquea
-            if (b.estaBloqueado(t, new Point(x, y))) {
-                return true;
-            }
+    for (Bloqueo b : estado.getBloqueosPorDia()) { 
+        if (b.isActiveAt(t) && b.estaBloqueado(t, new Point(x, y))) {
+            return true;
         }
-        return false;
     }
+    return false;
+}
 
     private List<Point> findPathAStar(Point start, Point end, LocalDateTime startTime, ExecutionContext estado) {
         PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingInt(node -> node.fCost));
@@ -914,8 +922,11 @@ public class OrchestratorService {
             closedSet.add(currentNode.position);
 
             for (Point neighborPos : getNeighbors(currentNode.position)) {
+                LocalDateTime tiempoLlegadaVecino = startTime.plusMinutes(currentNode.gCost + 1);
+
                 if (closedSet.contains(neighborPos) || 
-                    isBlockedMove(neighborPos.x, neighborPos.y, startTime.plusMinutes(currentNode.gCost + 1), estado)) {
+                    isBlockedMove(neighborPos.x, neighborPos.y, tiempoLlegadaVecino, estado) ||
+                    isBlockedMove(currentNode.position.x, currentNode.position.y, tiempoLlegadaVecino, estado)) {
                     continue;
                 }
 
@@ -956,7 +967,7 @@ public class OrchestratorService {
      */
     public List<Point> buildManhattanPath(int x1, int y1, int x2, int y2, LocalDateTime tiempoInicial, ExecutionContext estado) {
         List<Point> path = new ArrayList<>();
-        Point current = new Point(x1, y1);
+        /*Point current = new Point(x1, y1);
         LocalDateTime t = tiempoInicial;
 
         while (current.x != x2 || current.y != y2) {
@@ -982,6 +993,12 @@ public class OrchestratorService {
             }
             path.add(next);
             t = tiempoLlegada;
+        }*/
+        path = findPathAStar(new Point(x1, y1), new Point(x2, y2), tiempoInicial, estado);
+        if (path == null || path.isEmpty()) {
+            System.err.printf("Error: No hay ruta de (%d,%d) a (%d,%d) en %s debido a bloqueos%n", 
+                    x1, y1, x2, y2, tiempoInicial);
+            return Collections.emptyList();
         }
         return path;
     }
@@ -1015,38 +1032,26 @@ public class OrchestratorService {
      * @param simulationId El ID de la simulación
      */
     private void actualizarBloqueosActivos(ExecutionContext contexto, LocalDateTime tiempoActual) {
-        List<Bloqueo> todosBloqueos = contexto.getBloqueos();
-        
-        // 1. Verificar bloqueos que deberían activarse
-        for (Bloqueo b : todosBloqueos) {
-            // Si el bloqueo está activo en este tiempo pero no estaba activo antes
-            if (b.isActiveAt(tiempoActual) && b.getLastKnownState() != Bloqueo.Estado.ACTIVO) {
-                // Añadir a la lista de activos
-                contexto.addBloqueoActivo(b);
-                // Actualizar estado
-                b.setLastKnownState(Bloqueo.Estado.ACTIVO);
-            
-                
-                /*System.out.printf("🚧 Bloqueo activado en %s: %s (desde %s hasta %s)%n", 
-                        tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());*/
-            }
+    List<Bloqueo> bloqueosQueInicianAhora = contexto.getBloqueosPorTiempo().remove(tiempoActual);
+    if (bloqueosQueInicianAhora != null) {
+        for (Bloqueo b : bloqueosQueInicianAhora) {
+            contexto.addBloqueoActivo(b);
+            b.setLastKnownState(Bloqueo.Estado.ACTIVO);
+            System.out.printf("🚧 Bloqueo activado: %s%n", b.getDescription());
         }
-        
-        // 2. Verificar bloqueos que deberían desactivarse
-        List<Bloqueo> bloqueosActivos = new ArrayList<>(contexto.getBloqueosActivos());
-        for (Bloqueo b : bloqueosActivos) {
-            if (!b.isActiveAt(tiempoActual)) {
-                // Si estaba marcado como activo, notificamos que ha terminado
-                if (b.getLastKnownState() == Bloqueo.Estado.ACTIVO) {
-                    // Eliminar de la lista de activos
-                    contexto.removeBloqueoActivo(b);
-                    // Actualizar estado
-                    b.setLastKnownState(Bloqueo.Estado.TERMINADO);
-                    
-                    /*System.out.printf("✅ Bloqueo finalizado en %s: %s (desde %s hasta %s)%n", 
-                            tiempoActual, b.getDescription(), b.getStartTime(), b.getEndTime());*/
-                }
+    }
+
+    // 2. Revisar la lista de activos (que siempre es pequeña) para desactivar los que terminaron
+    // Esta parte de tu lógica ya era eficiente y se mantiene.
+    List<Bloqueo> bloqueosActivos = new ArrayList<>(contexto.getBloqueosActivos());
+    for (Bloqueo b : bloqueosActivos) {
+        if (!b.isActiveAt(tiempoActual)) {
+            if (b.getLastKnownState() == Bloqueo.Estado.ACTIVO) {
+                contexto.removeBloqueoActivo(b);
+                b.setLastKnownState(Bloqueo.Estado.TERMINADO);
+                System.out.printf("✅ Bloqueo finalizado: %s%n", b.getDescription());
             }
         }
     }
+}
 }
