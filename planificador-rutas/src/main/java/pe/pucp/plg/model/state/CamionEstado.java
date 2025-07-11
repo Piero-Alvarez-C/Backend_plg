@@ -15,7 +15,7 @@ public class CamionEstado {
         AVAILABLE,      // Disponible para nuevas asignaciones
         DELIVERING,     // En ruta para descargar o recargar
         RETURNING,      // Regresando al depósito o a un tanque
-        PROCESSING      // Procesando un pedido
+        UNAVAILABLE      // Procesando un pedido
     }
 
     // === Referencia a la plantilla ===
@@ -37,6 +37,11 @@ public class CamionEstado {
     private List<Point> rutaActual = new ArrayList<>();
     private int pasoActual = 0;      
     private List<Point> history = new ArrayList<>();
+    
+    // --- Desvios ---
+    private List<Point> rutaBackup = new ArrayList<>();
+    private List<Pedido> pedidosBackup = new ArrayList<>();
+    private Pedido pedidoDesvio = null;
 
     // --- Estadísticas de consumo ---
     private double consumoAcumulado = 0.0;
@@ -101,6 +106,10 @@ public class CamionEstado {
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public double getCombustibleGastado() { return combustibleGastado; }
 
+    public List<Point> getRutaBackup() { return rutaBackup; }
+    public List<Pedido> getPedidosBackup() { return pedidosBackup; }
+    public Pedido getPedidoDesvio() { return pedidoDesvio; }
+
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
     public void setCombustibleDisponible(double nuevoCombustible) { this.combustibleActual = nuevoCombustible; }
@@ -122,6 +131,16 @@ public class CamionEstado {
     public void setEnRetorno(boolean enRet) { this.enRetorno = enRet; }
     public void setConsumoAcumulado(double consumo) { this.consumoAcumulado = consumo; }
     public void setCombustibleGastado(double combustible) { this.combustibleGastado = combustible; }
+
+    public void setRutaBackup(List<Point> r) { this.rutaBackup = r; }
+    public void setPedidosBackup(List<Pedido> p) { this.pedidosBackup = p; }
+    public void setPedidoDesvio(Pedido d) { this.pedidoDesvio = d; }
+
+    public void clearDesvio() {
+        this.rutaBackup = null;
+        this.pedidosBackup = null;
+        this.pedidoDesvio = null;
+    }
 
     // --- Checkers ---
     public boolean tienePasosPendientes() {

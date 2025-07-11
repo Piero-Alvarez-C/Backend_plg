@@ -1,5 +1,7 @@
 package pe.pucp.plg.dto;
 
+import java.util.List;
+
 public class CamionDTO {
     private String id;
     private int x;
@@ -8,6 +10,7 @@ public class CamionDTO {
     private double combustibleDisponible;
     private String status;
     private double consumoAcumulado;
+    private List<PointDTO> ruta;
 
     // Getters y Setters
     public String getId() { return id; }
@@ -33,5 +36,10 @@ public class CamionDTO {
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public void setConsumoAcumulado(double consumoAcumulado) {
         this.consumoAcumulado = consumoAcumulado;
+    }
+
+    public List<PointDTO> getRuta() { return ruta; }
+    public void setRuta(List<PointDTO> ruta) {
+        this.ruta = ruta;
     }
 }

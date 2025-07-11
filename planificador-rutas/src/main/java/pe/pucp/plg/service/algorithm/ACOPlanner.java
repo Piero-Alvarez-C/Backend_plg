@@ -64,7 +64,7 @@ public class ACOPlanner {
                     double[][] prob = calcularProbabilidades(rutas, clonedFlota, pedidosActivos, noAsignados, tau, tiempoActual);
 
                     Seleccion sel = muestrearPar(prob, noAsignados);
-                    if (sel == null) break; // No more valid assignments
+                    //if (sel == null) break; // No more valid assignments
 
                     asignarPedidoARuta(sel.camionIdx, sel.pedidoIdx, rutas, clonedFlota, pedidosActivos, tiempoActual);
                     noAsignados.remove(Integer.valueOf(sel.pedidoIdx));
@@ -98,8 +98,22 @@ public class ACOPlanner {
                 }
             }
         }
+
+        if (mejorSol == null || mejorSol.isEmpty()) {
+            System.out.printf("⚠️ [ACO] No pudo generar solución para pedidos: %s%n",
+                    pedidosActivos.stream()
+                            .map(p -> "#" + p.getId())
+                            .collect(Collectors.joining(", "))
+            );
+            // aquí puedes optar por devolver Collections.emptyList()
+            // o retornar directamente mejorSol (que es null/empty)
+            return Collections.emptyList();
+        }
+        
         return mejorSol != null ? mejorSol : Collections.emptyList();
     }
+
+    
 
     // ------------------------------------------------------------
     // 2) Copia profunda de la flota para cada hormiga

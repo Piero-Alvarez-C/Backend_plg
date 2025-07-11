@@ -24,6 +24,12 @@ public class MapperUtil {
         dto.setCombustibleDisponible(camion.getCombustibleActual()); // Corrected
         dto.setStatus(camion.getStatus().name());
         // dto.setConsumoAcumulado(camion.getConsumoAcumulado()); // Getter does not exist, commented out for now
+        if (camion.getRutaActual() != null) {
+            List<PointDTO> ruta = camion.getRutaActual().stream()
+                    .map(MapperUtil::toPointDTO)
+                    .collect(Collectors.toList());
+            dto.setRuta(ruta);
+        }
         return dto;
     }
 
@@ -64,9 +70,7 @@ public class MapperUtil {
     }
 
     public static PointDTO toPointDTO(Point p) {
-        PointDTO dto = new PointDTO();
-        dto.setX(p.x);
-        dto.setY(p.y);
+        PointDTO dto = new PointDTO(p.x, p.y);
         return dto;
     }
 
