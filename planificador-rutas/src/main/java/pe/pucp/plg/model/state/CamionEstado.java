@@ -119,7 +119,8 @@ public class CamionEstado {
     public void setStatus(TruckStatus newStatus) { this.status = newStatus; }
     public void setRuta(List<Point> nuevaRuta) {
         this.rutaActual = new ArrayList<>(nuevaRuta);
-        this.pasoActual = 0; // Reset to start of the new route
+        // Ya no necesitamos reiniciar pasoActual porque ahora trabajamos
+        // eliminando elementos del principio de la lista
     }
     public void setPasoActual(int nuevoPaso) { this.pasoActual = nuevoPaso; }
     public void setReabastecerEnTanque(TanqueDinamico tanque) { this.reabastecerEnTanque = tanque; }
@@ -144,7 +145,7 @@ public class CamionEstado {
 
     // --- Checkers ---
     public boolean tienePasosPendientes() {
-        return pasoActual < rutaActual.size();
+        return !rutaActual.isEmpty();
     }
 
     public void registrarCargaPedido(Pedido p) { 
@@ -154,12 +155,12 @@ public class CamionEstado {
     }    
 
     public boolean tieneRutaAsignada() {
-        return pasoActual != -1 && !rutaActual.isEmpty();
+        return !rutaActual.isEmpty();
     }
     
     public boolean estaEnDestinoDeRuta() {
         if (!tieneRutaAsignada()) return true;
-        return pasoActual >= rutaActual.size();
+        return rutaActual.isEmpty();
     }
 
     public boolean estaLibre(LocalDateTime tiempoActual) {
@@ -179,8 +180,7 @@ public class CamionEstado {
         consumoAcumulado += gasto;
         combustibleActual -= gasto ;
         combustibleGastado += gasto;
-        Point next = rutaActual.get(pasoActual);
-        pasoActual++;
+        Point next = rutaActual.remove(0);
         moverA(next);
     }
 
@@ -200,7 +200,6 @@ public class CamionEstado {
         pedidosCargados.clear();
         rutaActual = Collections.emptyList();
         history.clear();
-        pasoActual = 0;
         reabastecerEnTanque = null;
         status = TruckStatus.AVAILABLE;
         tiempoLibre = null;

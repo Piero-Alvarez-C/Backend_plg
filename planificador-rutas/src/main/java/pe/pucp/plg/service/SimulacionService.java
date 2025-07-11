@@ -180,7 +180,7 @@ public class SimulacionService {
                                   " hasta " + fechaFin);
                 
                 // Ejecutar la simulación hasta que se alcance la fecha final
-                while (context.getCurrentTime().isBefore(fechaFin)) {
+                while (simulationManagerService.getActiveSimulationContext() != null && context.getCurrentTime().isBefore(fechaFin)) {
                     while(controlState.isPaused()) {
                         Thread.sleep(300);
                     }

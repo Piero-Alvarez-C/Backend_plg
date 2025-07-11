@@ -461,66 +461,54 @@ public class OrchestratorService {
     }
     // 2) Disparar eventos de entrega programados para este minuto
     private void triggerScheduledDeliveries(LocalDateTime tiempoActual, ExecutionContext contexto) {
-        //System.out.printf(">>> DEBUG t+%d: eventosEntrega = %s%n",
-        //        tiempoActual,
-        //        contexto.getEventosEntrega().stream()
-        //                .map(ev -> String.format("%s@%d",
-        //                        ev.pedido==null ? "RET" : "#"+ev.pedido.getId(),
-        //                        ev.time))
-        //                .collect(Collectors.toList())
-        //);
-
         Iterator<EntregaEvent> it = contexto.getEventosEntrega().iterator();
         List<EntregaEvent> nuevosEventos = new ArrayList<>();
 
         while (it.hasNext()) {
             EntregaEvent ev = it.next();
-            if (ev.time != tiempoActual) continue;
+            
+            // Compara el valor del tiempo, no la referencia del objeto
+            if (!ev.time.equals(tiempoActual)) {
+                continue;
+            }
+
+            // Si el evento se procesa, se elimina de la lista actual
             it.remove();
 
             CamionEstado camion = findCamion(ev.getCamionId(), contexto);
-            Pedido pedido       = ev.getPedido();
+            Pedido pedido = ev.getPedido();
 
-            // 1) Retorno al depósito
+            // CASO A: El evento es un retorno a la planta (no hay pedido)
             if (pedido == null) {
                 startReturn(camion, tiempoActual, nuevosEventos, contexto);
                 continue;
             }
 
-            // 2) Llegada al cliente → iniciar servicio de entrega
+            // CASO B: El evento es una LLEGADA al cliente
             if (camion.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
+                System.out.printf("➡️  LLEGADA: Camión %s llegó a pedido %d en %s. Inicia servicio.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                
                 camion.setX(pedido.getX());
                 camion.setY(pedido.getY());
-                camion.setStatus(CamionEstado.TruckStatus.UNAVAILABLE);
+                camion.setStatus(CamionEstado.TruckStatus.UNAVAILABLE); // Ocupado durante el servicio
+                
+                // Se agenda el evento de "Fin de Servicio" para más tarde
                 LocalDateTime finServicio = tiempoActual.plusMinutes(TIEMPO_SERVICIO);
                 camion.setTiempoLibre(finServicio);
-                /*System.out.printf("⏲️ t+%d: Camión %s inicia servicio de entrega, libre en t+%d%n",
-                        tiempoActual, camion.getPlantilla().getId(), finServicio);*/
-
-                // reagendar fin de servicio para este pedido
                 nuevosEventos.add(new EntregaEvent(finServicio, camion.getPlantilla().getId(), pedido));
-                continue;
-            }
+            } 
+            // CASO C: El evento es un FIN DE SERVICIO
+            else if (camion.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE) {
+                System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %d en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                
+                double antes = camion.getCapacidadDisponible();
+                camion.setCapacidadDisponible(antes - pedido.getVolumen());
+                pedido.setAtendido(true); 
+                camion.setStatus(CamionEstado.TruckStatus.AVAILABLE); // Vuelve a estar disponible
+                
+                camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
 
-            // 3) Fin de servicio → completar descarga y liberar camión
-            double antes = camion.getCapacidadDisponible();
-            camion.setStatus(CamionEstado.TruckStatus.AVAILABLE);
-            camion.setCapacidadDisponible(antes - pedido.getVolumen());
-            pedido.setAtendido(true);
-            camion.clearDesvio();                                      // limpia estado post-desvío
-            camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
-            /*System.out.printf("✅ t+%d: Completando pedido %d por Camión %s en (%d,%d); cap: %.1f→%.1f m³%n",
-                    tiempoActual, pedido.getId(), camion.getPlantilla().getId(),
-                    pedido.getX(), pedido.getY(), antes, camion.getCapacidadDisponible());*/
-
-            // 4) Replanificar: ruta original o nuevo desvío
-            if (pedido.equals(camion.getPedidoDesvio())) {
-                // restaurar ruta original
-                camion.getPedidosCargados().clear();
-                camion.getPedidosCargados().addAll(camion.getPedidosBackup());
-                camion.setRutaBackup(Collections.emptyList());
-                camion.setPedidosBackup(Collections.emptyList());
-
+                // Después de entregar, decide si sigue con su ruta o vuelve a la base
                 if (!camion.getPedidosCargados().isEmpty()) {
                     Pedido siguiente = camion.getPedidosCargados().get(0);
                     List<Point> ruta = buildManhattanPath(
