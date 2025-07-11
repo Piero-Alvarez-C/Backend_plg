@@ -430,7 +430,19 @@ public class ACOPlanner {
                     estado.getTanques().get(0).getCapacidadTotal());
         }
 
-        // 4) Avanzar o procesar retorno y entregas por separado
+        // ——— 2) DISPARAR SERVICIO SI LLEGÓ POR “PASOS”, por si falla el evento ———
+        //for (CamionDinamico c : estado.getCamiones()) {
+        //    // Si estaba en ruta y ya acabó todos los pasos, arranca el servicio
+        //    if (c.getStatus() == CamionDinamico.TruckStatus.DELIVERING  && !c.tienePasosPendientes()) {
+        //        c.setStatus(CamionDinamico.TruckStatus.UNAVAILABLE);
+        //        int finServicio = tiempoActual + TIEMPO_SERVICIO;
+        //        c.setLibreEn(finServicio);
+        //        System.out.printf("⏲️ t+%d: Camión %s inicia servicio de entrega (backup), libre en t+%d%n", tiempoActual, c.getId(), finServicio);
+        //        // no hacemos continue aquí, porque luego triggerScheduledDeliveries lo completará
+        //    }
+        //}
+
+        // 3) Avanzar o procesar retorno y entregas por separado
         for (CamionDinamico c : estado.getCamiones()) {
             // 0) Está descargando/recargando => no avanza
             if (c.getStatus() == CamionDinamico.TruckStatus.UNAVAILABLE){
@@ -673,7 +685,8 @@ public class ACOPlanner {
                         );
                         int tt       = (int)Math.ceil(ruta.size() * (60.0 / 50.0));
                         int tLlegada = tiempoActual + tt;
-
+                        System.out.printf(">>> DEBUG SCHEDULING-AVAIL: pedido #%d a t+%d%n",
+                                p.getId(), tLlegada);
                         mejor.setStatus(CamionDinamico.TruckStatus.DELIVERING);
                         mejor.setLibreEn(tLlegada + TIEMPO_SERVICIO);
                         mejor.setRutaActual(ruta);
@@ -703,12 +716,14 @@ public class ACOPlanner {
                         }
 
                         // tiempo de llegada al desvío
-                        int pasos      = caminoDesvio.size();
-                        int tLlegada   = tiempoActual + pasos;         // antiguo
-                        tLlegada       = tLlegada + 1;
+                        int tt = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                        int tLlegada   = tiempoActual + tt ;         // antiguo
                         // mantengo camión en DELIVERING y bloqueado hasta fin de servicio
                         mejor.setStatus(CamionDinamico.TruckStatus.DELIVERING);
                         mejor.setLibreEn(tLlegada + TIEMPO_SERVICIO);
+
+                        System.out.printf(">>> DEBUG SCHEDULING-PARCIAL: pedido #%d a t+%d%n",
+                                p.getId(), tLlegada);
 
                         mejor.getRutaActual().clear();
                         mejor.setRutaActual(new ArrayList<>(caminoDesvio));
@@ -761,6 +776,15 @@ public class ACOPlanner {
     }
     // 2) Disparar eventos de entrega programados para este minuto
     private void triggerScheduledDeliveries(int tiempoActual) {
+        System.out.printf(">>> DEBUG t+%d: eventosEntrega = %s%n",
+                tiempoActual,
+                estado.getEventosEntrega().stream()
+                        .map(ev -> String.format("%s@%d",
+                                ev.pedido==null ? "RET" : "#"+ev.pedido.getId(),
+                                ev.time))
+                        .collect(Collectors.toList())
+        );
+
         Iterator<EntregaEvent> it = estado.getEventosEntrega().iterator();
         List<EntregaEvent> nuevosEventos = new ArrayList<>();
 
@@ -874,7 +898,6 @@ public class ACOPlanner {
         int destY = mejorT != null ? mejorT.getPosY() : dy;
         if (mejorT != null) {
             mejorT.setDisponible(mejorT.getDisponible() - falta);
-            //c.setDisponible(c.getCapacidad()); // <-- recarga tras tanque
             System.out.printf(
                     "🔁 t+%d: Tanque (%d,%d) reservado %.1fm³ → ahora %.1f m³%n",
                     tiempoActual, mejorT.getPosX(), mejorT.getPosY(),
@@ -892,11 +915,6 @@ public class ACOPlanner {
                 "⏱️ t+%d: Camión %s inicia retorno a (%d,%d) dist=%d%n",
                 tiempoActual, c.getId(), destX, destY, distMin
         );
-
-        // programo el evento de llegada para el retorno
-        //int tt = (int) Math.ceil(camino.size() * (60.0/50.0));
-        //c.setLibreEn(tiempoActual + tt + 15);  // tt minutos de viaje + 15 de recarga
-        //collector.add(new EntregaEvent(tiempoActual + tt, c, /*pedido=*/null));
     }
 
     // ------------------------------------------------------------
