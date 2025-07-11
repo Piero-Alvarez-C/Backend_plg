@@ -30,6 +30,7 @@ public class CamionEstado {
     private int x = 12;
     private int y = 8;
     private LocalDateTime tiempoLibre; 
+    private LocalDateTime tiempoInicioAveria; // Nuevo: instante en que inicia la avería
     private boolean enRetorno = false; 
     private TruckStatus status = TruckStatus.AVAILABLE;
 
@@ -43,10 +44,20 @@ public class CamionEstado {
     private double consumoAcumulado = 0.0;
     private double combustibleGastado = 0.0;
 
+    public LocalDateTime getTiempoInicioAveria() {
+        return tiempoInicioAveria;
+    }
+    public void setTiempoInicioAveria(LocalDateTime tiempoInicioAveria) {
+        this.tiempoInicioAveria = tiempoInicioAveria;
+    }
+
     // --- Para recarga en tanque ---
     private TanqueDinamico reabastecerEnTanque = null; 
     private LocalDateTime retHora;
     private int retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
+    
+    // --- Para averías ---
+    private String tipoAveriaActual = null; // T1, T2, T3 o null si no hay avería
 
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
@@ -78,6 +89,7 @@ public class CamionEstado {
         this.reabastecerEnTanque = (original.reabastecerEnTanque != null) ? new TanqueDinamico(original.reabastecerEnTanque) : null;
         this.status = original.status;
         this.tiempoLibre = original.tiempoLibre;
+        this.tipoAveriaActual = original.tipoAveriaActual;
     }
 
     // Getters
@@ -101,6 +113,7 @@ public class CamionEstado {
     public boolean getEnRetorno() { return enRetorno; }
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public double getCombustibleGastado() { return combustibleGastado; }
+    public String getTipoAveriaActual() { return tipoAveriaActual; }
 
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
@@ -123,6 +136,7 @@ public class CamionEstado {
     public void setEnRetorno(boolean enRet) { this.enRetorno = enRet; }
     public void setConsumoAcumulado(double consumo) { this.consumoAcumulado = consumo; }
     public void setCombustibleGastado(double combustible) { this.combustibleGastado = combustible; }
+    public void setTipoAveriaActual(String tipo) { this.tipoAveriaActual = tipo; }
 
     // --- Checkers ---
     public boolean tienePasosPendientes() {

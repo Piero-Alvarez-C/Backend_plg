@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 
 /**
@@ -123,6 +124,21 @@ public class ResourceLoader {
         ClassPathResource resource = new ClassPathResource(nombreArchivo);
         try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
             return FileCopyUtils.copyToString(reader);
+        }
+    }
+
+    /**
+     * Carga el mapa de averías por turno a partir del archivo averias/averias.txt en resources.
+     * Formato de línea esperado: "T1_CAM001_TI1".
+     * @return Mapa turno → (camiónId → tipoIncidente)
+     */
+    public static Map<String, Map<String, String>> cargarAverias() {
+        try {
+            String contenido = leerContenidoArchivo("averias.txt");
+            return ParseadorArchivos.parsearAverias(contenido);
+        } catch (IOException e) {
+            System.err.println("Error cargando averías: " + e.getMessage());
+            return Collections.emptyMap();
         }
     }
 }

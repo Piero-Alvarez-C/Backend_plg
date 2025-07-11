@@ -15,6 +15,7 @@ import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
 import pe.pucp.plg.util.ResourceLoader;
 import pe.pucp.plg.util.MapperUtil;
+import java.util.Collections;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -143,6 +144,12 @@ public class OrchestratorService {
 
         // 4. Avanzar cada camión en sus rutas actuales
         for (CamionEstado c : contexto.getCamiones()) {
+            // Los camiones averiados NO deben avanzar en sus rutas
+            /*if (c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) {
+                // Omitir este camión - está averiado y no debe moverse
+                continue;
+            }*/ 
+            
             if (c.tienePasosPendientes()) {
                 c.avanzarUnPaso();
             } else if(c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
@@ -295,6 +302,22 @@ public class OrchestratorService {
      * @param contexto El contexto de ejecución
      * @param tiempoActual El tiempo actual de la simulación
      */
+    /**
+     * Remueve todos los eventos de entrega pendientes para un camión específico.
+     */
+    private void removerEventosEntregaDeCamion(String camionId, ExecutionContext contexto) {
+        Iterator<EntregaEvent> itEv = contexto.getEventosEntrega().iterator();
+        while (itEv.hasNext()) {
+            EntregaEvent ev = itEv.next();
+            if (ev.getCamionId().equals(camionId)) {
+                ev.getPedido().setProgramado(false); // Liberar el pedido
+                System.out.printf("❌ Evento de entrega eliminado por avería: Pedido %s de camión %s%n",
+                        ev.getPedido().getId(), camionId);
+                itEv.remove();
+            }
+        }
+    }
+
     private void procesarEventosEntrega(ExecutionContext contexto, LocalDateTime tiempoActual, String simulationId) {
         Iterator<EntregaEvent> itEv = contexto.getEventosEntrega().iterator();
         while (itEv.hasNext()) {
@@ -302,7 +325,21 @@ public class OrchestratorService {
             if (ev.time.equals(tiempoActual)) {
                 CamionEstado camion = findCamion(ev.getCamionId(), contexto);
                 if (camion != null) {
-                    // Actualizar posición y estado del camión
+                    // Verificar que el camión NO esté averiado
+                    if (camion.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) {
+                        // NO procesar entregas para camiones averiados
+                        System.out.printf("⚠️ %s: Evento de entrega ignorado para camión %s (AVERIADO) → Pedido %s%n",
+                                tiempoActual, camion.getPlantilla().getId(), ev.getPedido().getId());
+                        
+                        // Reprogramar el pedido (ponerlo como no programado para que pueda ser asignado nuevamente)
+                        ev.getPedido().setProgramado(false);
+                        
+                        // Eliminar el evento sin procesar la entrega
+                        itEv.remove();
+                        continue;
+                    }
+                    
+                    // Proceder con la entrega normal para camiones no averiados
                     camion.setX(ev.getPedido().getX());
                     camion.setY(ev.getPedido().getY());
                     camion.setTiempoLibre(tiempoActual.plusMinutes(15)); // 15 minutos para descargar
@@ -390,8 +427,8 @@ public class OrchestratorService {
         // Si cambió el turno, limpiar estados de averías anteriores
         if (!turnoActual.equals(contexto.getTurnoAnterior())) {
             contexto.setTurnoAnterior(turnoActual);
-            contexto.getAveriasAplicadas().clear();
-            contexto.getCamionesInhabilitados().clear();
+            //contexto.getAveriasAplicadas().clear();
+            
         }
         
         // Aplicar averías programadas para este turno
@@ -403,15 +440,65 @@ public class OrchestratorService {
             CamionEstado c = findCamion(entry.getKey(), contexto);
             if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
                 // Determinar penalización según tipo de avería
-                int penal = entry.getValue().equals("T1") ? 30 : 
-                           entry.getValue().equals("T2") ? 60 : 90;
-                           
+                String tipoaveria = entry.getValue();
+                int minutosActuales = tiempoActual.getHour() * 60 + tiempoActual.getMinute();
+                int penal=calcularTiempoAveria(turnoActual,tipoaveria,minutosActuales);           
                 c.setTiempoLibre(tiempoActual.plusMinutes(penal));
+                c.setTiempoInicioAveria(tiempoActual); // Guardar cuándo inicia la avería
+                c.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
+                // Guardar el tipo de avería en el camión para usarlo después
+                c.setTipoAveriaActual(tipoaveria);
+
+
+                // --- Acciones inmediatas por avería ---
+                // Remover eventos de entrega pendientes para este camión
+                removerEventosEntregaDeCamion(c.getPlantilla().getId(), contexto);
+                // Liberar pedidos pendientes y limpiar ruta
+                for (Pedido pPend : new ArrayList<>(c.getPedidosCargados())) {
+                    pPend.setProgramado(false); // volver a la cola de planificación
+                    System.out.println("🔴 Pedido " + pPend.getId() + " liberado por avería del camión " + c.getPlantilla().getId());
+                }
+                // Limpieza total de datos de rutas y pedidos para el camión averiado
+                c.getPedidosCargados().clear();  // Limpiar pedidos cargados
+                c.setRuta(Collections.emptyList());  // Limpiar ruta actual
+                c.setPasoActual(0);  // Resetear paso actual
+                c.getHistory().clear();  // Limpiar historial de movimientos
+                
+                // Restaurar capacidad total del camión (queda vacío tras trasvase virtual)
+                c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
                 contexto.getAveriasAplicadas().add(key);
                 contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
                 
-                System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta %s%n", 
-                                 entry.getValue(), c.getPlantilla().getId(), tiempoActual.plusMinutes(penal));
+                // Determinar tiempos para log según tipo de avería
+                LocalDateTime tiempoFinReparacion = tiempoActual.plusMinutes(penal);
+                LocalDateTime tiempoFinInmovilizacionEnSitio;
+                
+                switch(tipoaveria) {
+                    case "T1":
+                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(120); // 2 horas
+                        System.out.printf("🔧 Avería tipo T1 en camión %s - Inmovilizado en sitio hasta %s%n", 
+                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
+                        System.out.printf("🔧 Camión %s completamente disponible en %s%n",
+                                      c.getPlantilla().getId(), tiempoFinReparacion);
+                        break;
+                    case "T2":
+                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(120); // 2 horas
+                        System.out.printf("🔧 Avería tipo T2 en camión %s - Inmovilizado en sitio hasta %s%n", 
+                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
+                        System.out.printf("🏭 Camión %s en taller desde %s hasta %s%n",
+                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio, tiempoFinReparacion);
+                        break;
+                    case "T3":
+                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(240); // 4 horas
+                        System.out.printf("🔧 Avería tipo T3 en camión %s - Inmovilizado en sitio hasta %s%n", 
+                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
+                        System.out.printf("🏭 Camión %s en taller desde %s hasta %s (turno 1 del día A+3)%n",
+                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio, tiempoFinReparacion);
+                        break;
+                    default:
+                        System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta %s%n", 
+                                      tipoaveria, c.getPlantilla().getId(), tiempoFinReparacion);
+                }
                                  
                 replanificar = true;
             }
@@ -420,17 +507,103 @@ public class OrchestratorService {
         // Revisar camiones que ya pueden volver a servicio
         Iterator<String> it = contexto.getCamionesInhabilitados().iterator();
         while (it.hasNext()) {
-            CamionEstado c = findCamion(it.next(), contexto);
+            String camionId = it.next();
+            CamionEstado c = findCamion(camionId, contexto);
+            String tipoAveria = c.getTipoAveriaActual();
+            // Verificamos si el camión ya ha cumplido su tiempo de inmovilización
+            // Calcular y mostrar el tiempo transcurrido desde que se declaró la avería
+            long minutosTranscurridos = java.time.Duration.between(c.getTiempoInicioAveria(), tiempoActual).toMinutes();
+            // Solo teleportar si se ha cumplido exactamente el tiempo de inmovilización calculado
+            if ((tipoAveria.equals("T2") && minutosTranscurridos > 120) 
+            || (tipoAveria.equals("T3") && minutosTranscurridos > 240)) {
+
+                // Para averías T2 y T3, teleportar inmediatamente a posición de origen
+                if (tipoAveria != null && (tipoAveria.equals("T2") || tipoAveria.equals("T3"))) {
+                    c.setX(c.getPlantilla().getInitialX());
+                    c.setY(c.getPlantilla().getInitialY());
+                    System.out.printf("🚚 Camión %s TELEPORTADO a origen (%d,%d) tras finalizar exactamente avería tipo %s en %s%n", 
+                                    c.getPlantilla().getId(), c.getX(), c.getY(), tipoAveria, tiempoActual);
+                }
+            }
+
+            // Si el camión está disponible o su tiempo libre ha expirado
             if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
                 it.remove();
+                // Restaurar estado del camión tras reparación
+                c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
+                c.setTiempoLibre(null);
+                c.setRuta(java.util.Collections.emptyList());
+                c.setPasoActual(0);
+                c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
                 System.out.printf("🚚 Camión %s reparado y disponible nuevamente en %s%n", 
-                                 c.getPlantilla().getId(), tiempoActual);
+                                c.getPlantilla().getId(), tiempoActual);
+                // Limpiar el tipo de avería ya que el camión está reparado
+                
+                c.setTipoAveriaActual(null);
                 replanificar = true;
             }
         }
         
         return replanificar;
     }
+
+
+    public static int calcularTiempoAveria(String turnoActual, String tipoIncidente  ,int tiempoActual) {
+
+        int inactividad = 0;
+        int minutosEnTurno = tiempoActual % 480; // Minutos dentro del turno actual
+        int minutosHastaFinTurno = 480 - minutosEnTurno; // Minutos hasta fin de turno
+
+        switch (tipoIncidente) {
+            case "T1":
+                // Tipo 1: 2 horas en sitio (120 minutos)
+                inactividad = 120;
+                break;
+
+            case "T2":
+                // Tipo 2: 2 horas en sitio + tiempo variable según turno
+                inactividad = 120; // Inmovilización inicial de 2 horas
+
+                switch (turnoActual) {
+                    case "T1":
+                        // Disponible en turno 3 del mismo día (saltar turno 2 completo)
+                        inactividad += minutosHastaFinTurno; // Resto del turno 1
+                        inactividad += 480; // Turno 2 completo
+                        break;
+                    case "T2":
+                        // Disponible en turno 1 del día siguiente
+                        inactividad += minutosHastaFinTurno; // Resto del turno 2
+                        inactividad += 480; // Turno 3 completo
+                        break;
+                    case "T3":
+                        // Disponible en turno 2 del día siguiente
+                        inactividad += minutosHastaFinTurno; // Resto del turno 3
+                        inactividad += 480; // Turno 1 del día siguiente completo
+                        break;
+                }
+                break;
+
+            case "T3":
+                // Tipo 3: 4 horas en sitio + tiempo hasta T1 del día A+3
+                inactividad = 240; // Inmovilización inicial de 4 horas
+                
+                // Calcula minutos desde hora actual hasta las 00:00 del día A+3
+                // Primero, minutos restantes del día actual
+                int minutosRestantesDiaActual = 1440 - (tiempoActual % 1440);
+                // Más un día completo (día A+1 a A+2)
+                int minutosHastaDiaA3 = minutosRestantesDiaActual + 1440;
+                // Más 0 minutos del día A+3 (ya estamos al inicio del día)
+                inactividad += minutosHastaDiaA3;
+                break;
+
+            default:
+                System.out.println("Tipo de incidente desconocido: " + tipoIncidente);
+                break;
+        }
+
+        return inactividad;
+    }
+
 
     // Este método se ha movido a SimulacionService
 
