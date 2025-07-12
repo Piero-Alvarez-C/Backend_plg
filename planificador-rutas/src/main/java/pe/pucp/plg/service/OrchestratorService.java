@@ -430,7 +430,7 @@ public class OrchestratorService {
         // Si cambió el turno, limpiar estados de averías anteriores
         if (!turnoActual.equals(contexto.getTurnoAnterior())) {
             contexto.setTurnoAnterior(turnoActual);
-            //contexto.getAveriasAplicadas().clear();
+            contexto.getAveriasAplicadas().clear();
             
         }
         
@@ -438,12 +438,12 @@ public class OrchestratorService {
         Map<String, Averia> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
         for (Map.Entry<String, Averia> entry : averiasTurno.entrySet()) {
             String key = turnoActual + "_" + entry.getKey();
-            if (contexto.getAveriasAplicadas().contains(key)) continue;
             
             CamionEstado c = findCamion(entry.getKey(), contexto);
             Averia datoaveria = entry.getValue();
             // Para averías cargadas desde archivo
             if (datoaveria.isFromFile()) {
+                if (contexto.getAveriasAplicadas().contains(key)) continue;
                 // Solo aplicar si el camión está entregando y tiene una ruta asignada
                 if (c != null && c.getStatus() == CamionEstado.TruckStatus.DELIVERING && 
                     c.getRutaActual() != null && !c.getRutaActual().isEmpty()) {
@@ -458,7 +458,10 @@ public class OrchestratorService {
                         
                         if (aplicarAveria(c, datoaveria, tiempoActual, turnoActual, contexto, key)) {
                             replanificar = true;
+                            // Marcar la avería como aplicada
+                            contexto.getAveriasAplicadas().add(key);
                         }
+
                     }
                 }
             } else {
@@ -652,8 +655,6 @@ public class OrchestratorService {
         camion.setCapacidadDisponible(camion.getPlantilla().getCapacidadCarga());
         contexto.getCamionesInhabilitados().add(camion.getPlantilla().getId());
 
-        // Marcar la avería como aplicada
-        contexto.getAveriasAplicadas().add(key);
         
         System.out.println("🔧 Avería tipo " + averia.getTipoIncidente() + 
                         " aplicada al camión " + camion.getPlantilla().getId() + 
