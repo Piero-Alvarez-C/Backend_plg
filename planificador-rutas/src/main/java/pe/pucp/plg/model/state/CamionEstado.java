@@ -58,6 +58,7 @@ public class CamionEstado {
     
     // --- Para averías ---
     private String tipoAveriaActual = null; // T1, T2, T3 o null si no hay avería
+    private boolean enTaller = false; // Indica si el camión está en taller tras una avería tipo T2 o T3
 
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
@@ -114,6 +115,7 @@ public class CamionEstado {
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public double getCombustibleGastado() { return combustibleGastado; }
     public String getTipoAveriaActual() { return tipoAveriaActual; }
+    public boolean isEnTaller() { return enTaller; }
 
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
@@ -137,6 +139,7 @@ public class CamionEstado {
     public void setConsumoAcumulado(double consumo) { this.consumoAcumulado = consumo; }
     public void setCombustibleGastado(double combustible) { this.combustibleGastado = combustible; }
     public void setTipoAveriaActual(String tipo) { this.tipoAveriaActual = tipo; }
+    public void setEnTaller(boolean enTaller) { this.enTaller = enTaller; }
 
     // --- Checkers ---
     public boolean tienePasosPendientes() {
@@ -201,6 +204,7 @@ public class CamionEstado {
         status = TruckStatus.AVAILABLE;
         tiempoLibre = null;
         enRetorno = false;
+        enTaller = false; // Reiniciar estado de taller
     }
 
     public CamionEstado deepClone() {

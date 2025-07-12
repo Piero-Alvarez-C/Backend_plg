@@ -170,7 +170,7 @@ public class SimulacionService {
             Averia nuevaAveria = new Averia(turno, camionId, tipoAveria);
             contextoActual.getAveriasPorTurno()
                     .computeIfAbsent(turno, k -> new java.util.HashMap<>())
-                    .put(camionId, tipoAveria);
+                    .put(camionId, nuevaAveria);
             System.out.println("Camión " + camionId + " marcado con avería: " + tipoAveria + " para el turno " + turno);
             return nuevaAveria;
         } catch (Exception e) {

@@ -2,6 +2,8 @@ package pe.pucp.plg.util;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.FileCopyUtils;
+
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 
@@ -132,7 +134,7 @@ public class ResourceLoader {
      * Formato de línea esperado: "T1_CAM001_TI1".
      * @return Mapa turno → (camiónId → tipoIncidente)
      */
-    public static Map<String, Map<String, String>> cargarAverias() {
+    public static Map<String, Map<String, Averia>> cargarAverias() {
         try {
             String contenido = leerContenidoArchivo("averias.txt");
             return ParseadorArchivos.parsearAverias(contenido);

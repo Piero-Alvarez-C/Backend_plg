@@ -90,7 +90,7 @@ public class OperationService {
         String tipoAveria= dto.getTipoIncidente();
         Averia nuevAveria= new Averia(turno,camionId,tipoAveria);
         operationalContext.getAveriasPorTurno()
-                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
+                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, nuevAveria);
 
     
         // Mark the truck as unavailable if the breakdown is for the current/active turn

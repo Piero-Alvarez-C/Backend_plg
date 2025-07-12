@@ -123,7 +123,7 @@ public class MapperUtil {
                                     AveriaDTO dto = new AveriaDTO();
                                     dto.setTurno(turnoEntry.getKey());
                                     dto.setCodigoVehiculo(avEntry.getKey());
-                                    dto.setTipoIncidente(avEntry.getValue());
+                                    dto.setTipoIncidente(avEntry.getValue().getTipoIncidente());
                                     return dto;
                                 })
                         ).toList());

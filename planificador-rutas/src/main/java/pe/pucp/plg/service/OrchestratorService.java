@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.EntregaEvent;
 import pe.pucp.plg.model.common.Pedido;
@@ -15,7 +16,6 @@ import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
 import pe.pucp.plg.util.ResourceLoader;
 import pe.pucp.plg.util.MapperUtil;
-import java.util.Collections;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -287,6 +287,9 @@ public class OrchestratorService {
             // 4.2 Traducir el plan a acciones concretas sobre el estado real
             aplicarRutas(tiempoActual, nuevasRutas, candidatos, contexto, simulationId);
             
+
+            //4.2 b) Generar puntos averias para camiones
+            generarPuntosAverias(contexto);
             // 4.3 Guardar las rutas en el contexto para visualización o análisis
             contexto.setRutas(nuevasRutas);
         }
@@ -432,76 +435,41 @@ public class OrchestratorService {
         }
         
         // Aplicar averías programadas para este turno
-        Map<String, String> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
-        for (Map.Entry<String, String> entry : averiasTurno.entrySet()) {
+        Map<String, Averia> averiasTurno = contexto.getAveriasPorTurno().getOrDefault(turnoActual, Collections.emptyMap());
+        for (Map.Entry<String, Averia> entry : averiasTurno.entrySet()) {
             String key = turnoActual + "_" + entry.getKey();
             if (contexto.getAveriasAplicadas().contains(key)) continue;
             
             CamionEstado c = findCamion(entry.getKey(), contexto);
-            if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
-                // Determinar penalización según tipo de avería
-                String tipoaveria = entry.getValue();
-                int minutosActuales = tiempoActual.getHour() * 60 + tiempoActual.getMinute();
-                int penal=calcularTiempoAveria(turnoActual,tipoaveria,minutosActuales);           
-                c.setTiempoLibre(tiempoActual.plusMinutes(penal));
-                c.setTiempoInicioAveria(tiempoActual); // Guardar cuándo inicia la avería
-                c.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
-                // Guardar el tipo de avería en el camión para usarlo después
-                c.setTipoAveriaActual(tipoaveria);
-
-
-                // --- Acciones inmediatas por avería ---
-                // Remover eventos de entrega pendientes para este camión
-                removerEventosEntregaDeCamion(c.getPlantilla().getId(), contexto);
-                // Liberar pedidos pendientes y limpiar ruta
-                for (Pedido pPend : new ArrayList<>(c.getPedidosCargados())) {
-                    pPend.setProgramado(false); // volver a la cola de planificación
-                    System.out.println("🔴 Pedido " + pPend.getId() + " liberado por avería del camión " + c.getPlantilla().getId());
+            Averia datoaveria = entry.getValue();
+            // Para averías cargadas desde archivo
+            if (datoaveria.isFromFile()) {
+                // Solo aplicar si el camión está entregando y tiene una ruta asignada
+                if (c != null && c.getStatus() == CamionEstado.TruckStatus.DELIVERING && 
+                    c.getRutaActual() != null && !c.getRutaActual().isEmpty()) {
+                    
+                    Integer puntoAveria = contexto.getPuntosAveria().get(entry.getKey());
+                    
+                    // Solo aplicar si hay un punto de avería calculado y el camión está en ese punto
+                    if (puntoAveria != null && c.getPasoActual() == puntoAveria) {
+                        System.out.println("🔍 Camión " + c.getPlantilla().getId() + 
+                                         " llegó al punto de avería calculado (paso " + puntoAveria + 
+                                         " de " + c.getRutaActual().size() + ")");
+                        
+                        if (aplicarAveria(c, datoaveria, tiempoActual, turnoActual, contexto, key)) {
+                            replanificar = true;
+                        }
+                    }
                 }
-                // Limpieza total de datos de rutas y pedidos para el camión averiado
-                c.getPedidosCargados().clear();  // Limpiar pedidos cargados
-                c.setRuta(Collections.emptyList());  // Limpiar ruta actual
-                c.setPasoActual(0);  // Resetear paso actual
-                c.getHistory().clear();  // Limpiar historial de movimientos
-                
-                // Restaurar capacidad total del camión (queda vacío tras trasvase virtual)
-                c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
-                contexto.getAveriasAplicadas().add(key);
-                contexto.getCamionesInhabilitados().add(c.getPlantilla().getId());
-                
-                // Determinar tiempos para log según tipo de avería
-                LocalDateTime tiempoFinReparacion = tiempoActual.plusMinutes(penal);
-                LocalDateTime tiempoFinInmovilizacionEnSitio;
-                
-                switch(tipoaveria) {
-                    case "T1":
-                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(120); // 2 horas
-                        System.out.printf("🔧 Avería tipo T1 en camión %s - Inmovilizado en sitio hasta %s%n", 
-                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
-                        System.out.printf("🔧 Camión %s completamente disponible en %s%n",
-                                      c.getPlantilla().getId(), tiempoFinReparacion);
-                        break;
-                    case "T2":
-                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(120); // 2 horas
-                        System.out.printf("🔧 Avería tipo T2 en camión %s - Inmovilizado en sitio hasta %s%n", 
-                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
-                        System.out.printf("🏭 Camión %s en taller desde %s hasta %s%n",
-                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio, tiempoFinReparacion);
-                        break;
-                    case "T3":
-                        tiempoFinInmovilizacionEnSitio = tiempoActual.plusMinutes(240); // 4 horas
-                        System.out.printf("🔧 Avería tipo T3 en camión %s - Inmovilizado en sitio hasta %s%n", 
-                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio);
-                        System.out.printf("🏭 Camión %s en taller desde %s hasta %s (turno 1 del día A+3)%n",
-                                      c.getPlantilla().getId(), tiempoFinInmovilizacionEnSitio, tiempoFinReparacion);
-                        break;
-                    default:
-                        System.out.printf("🔧 Avería tipo %s en camión %s - Inhabilitado hasta %s%n", 
-                                      tipoaveria, c.getPlantilla().getId(), tiempoFinReparacion);
+            } else {
+                // Para averías manuales, aplicar inmediatamente si el camión está disponible
+                if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
+                    if (aplicarAveria(c, datoaveria, tiempoActual, turnoActual, contexto, key)) {
+                        replanificar = true;
+                    }
                 }
-                                 
-                replanificar = true;
             }
+
         }
         
         // Revisar camiones que ya pueden volver a servicio
@@ -513,23 +481,28 @@ public class OrchestratorService {
             // Verificamos si el camión ya ha cumplido su tiempo de inmovilización
             // Calcular y mostrar el tiempo transcurrido desde que se declaró la avería
             long minutosTranscurridos = java.time.Duration.between(c.getTiempoInicioAveria(), tiempoActual).toMinutes();
-            // Solo teleportar si se ha cumplido exactamente el tiempo de inmovilización calculado
-            if ((tipoAveria.equals("T2") && minutosTranscurridos > 120) 
-            || (tipoAveria.equals("T3") && minutosTranscurridos > 240)) {
-
-                // Para averías T2 y T3, teleportar inmediatamente a posición de origen
-                if (tipoAveria != null && (tipoAveria.equals("T2") || tipoAveria.equals("T3"))) {
-                    c.setX(c.getPlantilla().getInitialX());
-                    c.setY(c.getPlantilla().getInitialY());
-                    System.out.printf("🚚 Camión %s TELEPORTADO a origen (%d,%d) tras finalizar exactamente avería tipo %s en %s%n", 
-                                    c.getPlantilla().getId(), c.getX(), c.getY(), tipoAveria, tiempoActual);
-                }
+            
+            // Solo teleportar si se ha cumplido el tiempo de inmovilización y no está en taller
+            if (tipoAveria != null && !c.isEnTaller() && 
+                ((tipoAveria.equals("T2") && minutosTranscurridos > 120) || 
+                 (tipoAveria.equals("T3") && minutosTranscurridos > 240))) {
+                
+                // Para averías T2 y T3, teleportar a posición de origen
+                c.setX(c.getPlantilla().getInitialX());
+                c.setY(c.getPlantilla().getInitialY());
+                // Marcar como en taller para evitar teleportaciones repetidas
+                c.setEnTaller(true);
+                
+                System.out.printf("🚚 Camión %s TELEPORTADO a origen (%d,%d) tras finalizar exactamente avería tipo %s en %s%n", 
+                                c.getPlantilla().getId(), c.getX(), c.getY(), tipoAveria, tiempoActual);
             }
 
             // Si el camión está disponible o su tiempo libre ha expirado
             if (c != null && (c.getTiempoLibre() == null || !c.getTiempoLibre().isAfter(tiempoActual))) {
                 it.remove();
                 // Restaurar estado del camión tras reparación
+                // Reiniciar estado de taller para futuras averías
+                c.setEnTaller(false);
                 c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
                 c.setTiempoLibre(null);
                 c.setRuta(java.util.Collections.emptyList());
@@ -603,8 +576,93 @@ public class OrchestratorService {
 
         return inactividad;
     }
+    /**
+    * Genera puntos de avería para todos los camiones con rutas asignadas
+    */
+    private void generarPuntosAverias(ExecutionContext contexto) {
+    
+    // Recorrer todos los camiones
+        for (CamionEstado camion : contexto.getCamiones()) {
+            // Solo calcular puntos de avería para camiones con ruta asignada
+            if (camion.tieneRutaAsignada() && camion.getRutaActual().size() > 0) {
+                calcularPuntosAveria(camion, contexto);
+            }
+        }
+    }
+    private void calcularPuntosAveria(CamionEstado camion, ExecutionContext contexto) {
+        String idCamion = camion.getPlantilla().getId();
+        int totalPasos = camion.getRutaActual().size();
+        
+        // Si la ruta es muy corta, no calculamos puntos de avería
+        if (totalPasos < 5) return;
+    
+        // Recorrer el mapa de averías por turno (T1, T2, T3)
+        for (Map.Entry<String, Map<String, Averia>> entryTurno : contexto.getAveriasPorTurno().entrySet()) {
+            Map<String, Averia> averiasPorCamion = entryTurno.getValue();
+            
+            // Verificar si hay una avería para este camión en este turno
+            if (averiasPorCamion.containsKey(idCamion)) {
+                Averia averia = averiasPorCamion.get(idCamion);
+                
+                // Solo procesamos averías cargadas desde archivo
+                if (averia.isFromFile()) {
 
+                    // Calcular punto aleatorio para esta avería
+                    Random random = new Random();
+                    int pasoMinimo = Math.max(1, (int) (totalPasos * 0.05)); // 5% de la ruta
+                    int pasoMaximo = Math.max(pasoMinimo + 1, (int) (totalPasos * 0.35)); // 35% de la ruta
+                    int pasoAveria = pasoMinimo + random.nextInt(pasoMaximo - pasoMinimo + 1);
+                    
+                    // Guardar el punto de avería en el contexto
+                    contexto.getPuntosAveria().put(idCamion, pasoAveria);
 
+                }
+            }
+        }
+    }
+    
+    private boolean aplicarAveria(CamionEstado camion, Averia averia, LocalDateTime tiempoActual, 
+                            String turnoActual, ExecutionContext contexto, String key) {
+    // Determinar penalización según tipo de avería
+        int minutosActuales = tiempoActual.getHour() * 60 + tiempoActual.getMinute();
+        int penal = calcularTiempoAveria(turnoActual, averia.getTipoIncidente(), minutosActuales);           
+        camion.setTiempoLibre(tiempoActual.plusMinutes(penal));
+        camion.setTiempoInicioAveria(tiempoActual); // Guardar cuándo inicia la avería
+        camion.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
+        // Guardar el tipo de avería en el camión para usarlo después
+        camion.setTipoAveriaActual(averia.getTipoIncidente());
+        // Reiniciar estado de taller para permitir teleportación si es necesario
+        camion.setEnTaller(false);
+
+        // --- Acciones inmediatas por avería ---
+        // Remover eventos de entrega pendientes para este camión
+        removerEventosEntregaDeCamion(camion.getPlantilla().getId(), contexto);
+        // Liberar pedidos pendientes y limpiar ruta
+        for (Pedido pPend : new ArrayList<>(camion.getPedidosCargados())) {
+            pPend.setProgramado(false); // volver a la cola de planificación
+            System.out.println("🔴 Pedido " + pPend.getId() + " liberado por avería del camión " + camion.getPlantilla().getId());
+        }
+        // Limpieza total de datos de rutas y pedidos para el camión averiado
+        camion.getPedidosCargados().clear();  // Limpiar pedidos cargados
+        camion.setRuta(Collections.emptyList());  // Limpiar ruta actual
+        camion.setPasoActual(0);  // Resetear paso actual
+        camion.getHistory().clear();  // Limpiar historial de movimientos
+
+        // Restaurar capacidad total del camión (queda vacío tras trasvase virtual)
+        camion.setCapacidadDisponible(camion.getPlantilla().getCapacidadCarga());
+        contexto.getCamionesInhabilitados().add(camion.getPlantilla().getId());
+
+        // Marcar la avería como aplicada
+        contexto.getAveriasAplicadas().add(key);
+        
+        System.out.println("🔧 Avería tipo " + averia.getTipoIncidente() + 
+                        " aplicada al camión " + camion.getPlantilla().getId() + 
+                        " en " + tiempoActual + 
+                        ". Tiempo estimado de reparación: " + penal + " minutos.");
+        
+        return true; // Siempre replanificar después de una avería
+    }
+    
     // Este método se ha movido a SimulacionService
 
     
