@@ -117,11 +117,7 @@ public class CamionEstado {
     public void setX(int x) { this.x = x; }
     public void setY(int y) { this.y = y; }   
     public void setStatus(TruckStatus newStatus) { this.status = newStatus; }
-    public void setRuta(List<Point> nuevaRuta) {
-        this.rutaActual = new ArrayList<>(nuevaRuta);
-        // Ya no necesitamos reiniciar pasoActual porque ahora trabajamos
-        // eliminando elementos del principio de la lista
-    }
+    public void setRuta(List<Point> nuevaRuta) { this.rutaActual = new ArrayList<>(nuevaRuta); }
     public void setPasoActual(int nuevoPaso) { this.pasoActual = nuevoPaso; }
     public void setReabastecerEnTanque(TanqueDinamico tanque) { this.reabastecerEnTanque = tanque; }
     public void setRetHora(LocalDateTime hora) { this.retHora = hora; }
@@ -187,7 +183,7 @@ public class CamionEstado {
     public void moverA(Point p) {
         x = p.x;
         y = p.y;
-        history.add(new Point(p.x, p.y));
+        //history.add(new Point(p.x, p.y));
     }
 
     public void reset() {
@@ -210,10 +206,4 @@ public class CamionEstado {
         return new CamionEstado(this);
     }
 
-    public void appendToHistory(List<Point> path) {
-        if (history.isEmpty())
-            history.add(new Point(x, y));
-        if (path != null)
-            history.addAll(path);
-    }
 }

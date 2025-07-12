@@ -379,7 +379,7 @@ public class OrchestratorService {
                         mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
                         mejor.setRuta(ruta);
                         mejor.setPasoActual(0);
-                        mejor.getHistory().addAll(ruta);
+                        //mejor.getHistory().addAll(ruta);
 
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionEstado cam = mejor;
@@ -416,7 +416,7 @@ public class OrchestratorService {
                         mejor.getRutaActual().clear();
                         mejor.setRuta(new ArrayList<>(caminoDesvio));
                         mejor.setPasoActual(0);
-                        mejor.getHistory().addAll(caminoDesvio);
+                        //mejor.getHistory().addAll(caminoDesvio);
 
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionEstado cam = mejor;
@@ -547,7 +547,7 @@ public class OrchestratorService {
                     camion.setRuta(ruta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                    camion.getHistory().addAll(ruta);
+                    //camion.getHistory().addAll(ruta);
                     int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
                     camion.setTiempoLibre(tiempoActual.plusMinutes(tt + TIEMPO_SERVICIO));
                     nuevosEventos.add(new EntregaEvent(tiempoActual.plusMinutes(tt), camion.getPlantilla().getId(), siguiente));
@@ -592,7 +592,7 @@ public class OrchestratorService {
         List<Point> camino = buildManhattanPath(sx, sy, destX, destY, tiempoActual, contexto);
         c.setRuta(camino);
         c.setPasoActual(0);
-        c.getHistory().addAll(camino);
+        //c.getHistory().addAll(camino);
 
         /*System.out.printf(
                 "⏱️ t+%d: Camión %s inicia retorno a (%d,%d) dist=%d%n",
@@ -855,7 +855,7 @@ public class OrchestratorService {
                     camion.setRuta(rutaCompleta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                    camion.getHistory().addAll(rutaCompleta);
+                    //camion.getHistory().addAll(rutaCompleta);
 
                     // 3) Programar un EntregaEvent secuencial para cada pedido
                     LocalDateTime t = tiempoActual;
