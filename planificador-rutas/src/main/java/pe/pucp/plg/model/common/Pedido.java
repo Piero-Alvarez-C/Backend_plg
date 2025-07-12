@@ -9,6 +9,7 @@ public class Pedido {
     boolean atendido = false;
     boolean descartado = false;
     boolean programado = false; 
+    private LocalDateTime horaEntregaProgramada;
 
     public Pedido(int id, LocalDateTime tiempoCreacion, int x, int y, double volumen, LocalDateTime tiempoLimite) {
         this.id = id; this.tiempoCreacion = tiempoCreacion;
@@ -51,4 +52,12 @@ public class Pedido {
     // → marcar como atendido:
     public void setProgramado(boolean programado) {this.programado = programado; }
     public void setAtendido(boolean a) { this.atendido = a; }
+
+    public LocalDateTime getHoraEntregaProgramada() {
+        return horaEntregaProgramada;
+    }
+
+    public void setHoraEntregaProgramada(LocalDateTime horaEntregaProgramada) {
+        this.horaEntregaProgramada = horaEntregaProgramada;
+    }
 }

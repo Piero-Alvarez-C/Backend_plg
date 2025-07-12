@@ -11,9 +11,8 @@ import pe.pucp.plg.model.context.ExecutionContext;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors; // Added
+import java.util.stream.Collectors; 
 
-import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.util.MapperUtil;
 
 @Service
@@ -39,7 +38,7 @@ public class OperationService {
     }
 
     // Método que se ejecuta periódicamente para avanzar las operaciones día a día
-    @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo
+    @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo CAMBIAR A 60 SEGUNDOS CUANDO PASEMOS A PRODUCCION 
     public void ejecutarOperacionesDiaADia() {
         try {
             System.out.println("======================================OPERACIONES===================================================");
@@ -177,10 +176,10 @@ public class OperationService {
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
-        if (operationalContext.getBloqueos() == null) {
+        if (operationalContext.getBloqueosActivos() == null) {
             return new ArrayList<>();
         }
-        return operationalContext.getBloqueos().stream()
+        return operationalContext.getBloqueosActivos().stream()
                 .map(MapperUtil::toBloqueoDTO)
                 .collect(Collectors.toList());
     }
@@ -196,84 +195,6 @@ public class OperationService {
         return operationalContext.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO)
                 .collect(Collectors.toList());
-    }
-
-    private CamionEstado findCamionOperacionalById(String id, ExecutionContext operationalContext) {
-        // ExecutionContext operationalContext = simulationManagerService.getOperationalContext(); // Removed
-        // Caller now ensures operationalContext is not null.
-        if (operationalContext.getCamiones() == null) {
-            return null;
-        }
-        return operationalContext.getCamiones().stream()
-                .filter(c -> c.getPlantilla().getId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
-
-    public boolean resetCamionOperacional(String id) {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-        CamionEstado camion = findCamionOperacionalById(id, operationalContext);
-        if (camion == null) {
-            return false;
-        }
-        // operationalContext already fetched
-        camion.reset(); 
-        operationalContext.getCamionesInhabilitados().remove(id); 
-        System.out.println("Camion " + id + " reset in operational context.");
-        // Emitir evento TRUCK_STATE_UPDATED
-        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
-        EventDTO estadoEvento = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
-        eventPublisher.publicarEventoOperacion(estadoEvento);
-
-        // Emitir evento ACTION_COMPLETED con acción RESET
-        TruckActionEventDTO accionEvento = new TruckActionEventDTO(id, "RESET");
-        EventDTO accionEventoDTO = EventDTO.of(EventType.ACTION_COMPLETED, accionEvento);
-        eventPublisher.publicarEventoOperacion(accionEventoDTO);
-        return true;
-    }
-
-    public boolean avanzarPasoCamionOperacional(String id) {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-        CamionEstado camion = findCamionOperacionalById(id, operationalContext); 
-        // operationalContext already fetched
-        if (camion == null || operationalContext.getCamionesInhabilitados().contains(id)) {
-            return false;
-        }
-        camion.avanzarUnPaso(); 
-        System.out.println("Camion " + id + " advanced one step in operational context.");
-        // ✅ Publicar evento TRUCK_STATE_UPDATED al topic (channel)
-        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
-        EventDTO evento = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
-        eventPublisher.publicarEventoOperacion(evento);
-        return true;
-    }
-
-    public boolean recargarCombustibleCamionOperacional(String id) {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
-        }
-        CamionEstado camion = findCamionOperacionalById(id, operationalContext);
-        if (camion == null) {
-            return false;
-        }
-        camion.recargarCombustible(); 
-        System.out.println("Camion " + id + " refueled in operational context.");
-        // 🟢 1. Enviar TRUCK_STATE_UPDATED (envía el id y el estado del camión)
-        CamionDTO camionDTO = MapperUtil.toCamionDTO(camion);
-        EventDTO eventoEstado = EventDTO.of(EventType.TRUCK_STATE_UPDATED, camionDTO);
-        eventPublisher.publicarEventoOperacion(eventoEstado);
-        // 🟢 2. Evento de acción completada
-        TruckActionEventDTO action = new TruckActionEventDTO(id, "REFUEL");
-        EventDTO eventoAccion = EventDTO.of(EventType.ACTION_COMPLETED, action);
-        eventPublisher.publicarEventoOperacion(eventoAccion);
-        return true;
     }
 
     // Placeholder for registering an event - to be used by OperacionesController

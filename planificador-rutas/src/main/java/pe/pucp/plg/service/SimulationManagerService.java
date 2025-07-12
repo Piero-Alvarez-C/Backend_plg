@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pe.pucp.plg.factory.FlotaFactory;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
@@ -82,11 +83,16 @@ public class SimulationManagerService {
         this.operationalContext.setPedidos(new ArrayList<>(initialPedidos));
 
         // 4. Initialize Bloqueos from ResourceLoader
-        this.operationalContext.setBloqueos(ResourceLoader.cargarBloqueosParaFecha(LocalDate.from(startTime)));
+        for (Bloqueo b : ResourceLoader.cargarBloqueosParaFecha(LocalDate.from(startTime))) {
+            this.operationalContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+            this.operationalContext.getBloqueosPorDia().add(b);
+        }
 
         // 5. Set initial simulation time for operational context
         this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
         this.operationalContext.setCurrentTime(startTime.minusMinutes(1));                     // fecha y hora
+
+        this.operationalContext.setIgnorarColapso(true);
 
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.
@@ -106,7 +112,7 @@ public class SimulationManagerService {
      * and this method should clone the operationalContext instead.
      * @return The ID of the newly created simulation context.
      */
-    public String crearContextoSimulacion() {
+    public String crearContextoSimulacion(boolean esColapso) {
         if(activeSimulationContext != null) {
             throw new IllegalStateException("Ya hay una simulación activa con ID: " + activeSimulationId + ". No se puede crear otra.");
         }
@@ -131,8 +137,14 @@ public class SimulationManagerService {
         this.activeSimulationContext.setPedidos(new ArrayList<>(initialPedidos));
         
         // Initialize Bloqueos from BloqueoRepository for the new simulation context
-        this.activeSimulationContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
+        for (Bloqueo b : bloqueoRepository.getBloqueos()) { // Assuming findAll() exists
+            this.activeSimulationContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+            this.activeSimulationContext.getBloqueosPorDia().add(b);
+        }
         this.activeSimulationContext.setCurrentTime(startTime); // Simulations typically start from t=0
+
+        // Para gestionar el colapso necesitamos una flag
+        this.activeSimulationContext.setIgnorarColapso(!esColapso);
 
         return this.activeSimulationId;
     }

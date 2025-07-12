@@ -77,6 +77,6 @@ public class BloqueoServiceImpl implements BloqueoService {
 
     @Override
     public List<Bloqueo> listarTodos(ExecutionContext context) {
-        return context.getBloqueos();
+        return context.getBloqueosActivos();
     }
 }

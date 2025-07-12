@@ -21,25 +21,4 @@ public class CamionController {
         return ResponseEntity.ok(lista);
     }
 
-    @PostMapping("/{id}/reset")
-    public ResponseEntity<?> reset(@PathVariable String id) {
-        boolean success = operationService.resetCamionOperacional(id);
-        if (!success) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{id}/paso")
-    public ResponseEntity<?> avanzarPaso(@PathVariable String id) {
-        boolean success = operationService.avanzarPasoCamionOperacional(id);
-        if (!success) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{id}/recargar")
-    public ResponseEntity<?> recargar(@PathVariable String id) {
-        boolean success = operationService.recargarCombustibleCamionOperacional(id);
-        if (!success) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().build();
-    }
-
 }
