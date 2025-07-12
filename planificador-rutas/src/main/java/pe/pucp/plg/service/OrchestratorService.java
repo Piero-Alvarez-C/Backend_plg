@@ -243,7 +243,7 @@ public class OrchestratorService {
         boolean haColapsado = false;
         while (itP.hasNext()) {
             Pedido p = itP.next();
-            if (!p.isAtendido() && !p.isDescartado() && tiempoActual.isAfter(p.getTiempoLimite())) {
+            if (!p.isAtendido() && !p.isDescartado() && !p.isEnEntrega() && tiempoActual.isAfter(p.getTiempoLimite()) || tiempoActual.isAfter(p.getTiempoLimite())) {
                 /*System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
                         tiempoActual, p.getId());*/
                 // Marca y elimina para no repetir el colapso
@@ -256,7 +256,7 @@ public class OrchestratorService {
         // COLAPSO
         if(haColapsado && !contexto.isIgnorarColapso()) {
             // Si ha colapsado y no se ignora, destruir la simulacion
-            System.out.printf("💥 Colapso detectado en t+%d, finalizando simulación%n", tiempoActual);
+            System.out.printf("💥 Colapso detectado en %s, finalizando simulación%n", tiempoActual);
             eventPublisher.publicarEventoSimulacion(simulationId, EventDTO.of(EventType.SIMULATION_COLLAPSED, null));
             return null;
         }
@@ -337,6 +337,7 @@ public class OrchestratorService {
                 p.setHoraEntregaProgramada(null);
                 });
 
+            //candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
             // B) Desvío local con búsqueda del mejor camión
             List<Pedido> sinAsignar = new ArrayList<>();
             for (Pedido p : candidatos) {
@@ -497,6 +498,7 @@ public class OrchestratorService {
                 camion.setX(pedido.getX());
                 camion.setY(pedido.getY());
                 camion.setStatus(CamionEstado.TruckStatus.UNAVAILABLE); // Ocupado durante el servicio
+                pedido.setEnEntrega(true);
                 
                 // Se agenda el evento de "Fin de Servicio" para más tarde
                 LocalDateTime finServicio = tiempoActual.plusMinutes(TIEMPO_SERVICIO);
@@ -560,8 +562,6 @@ public class OrchestratorService {
         // añadir todos los eventos recién creados
         contexto.getEventosEntrega().addAll(nuevosEventos);
     }
-
-
 
     // helper: inicia retorno y programa el evento de llegada
     private void startReturn(CamionEstado c, LocalDateTime tiempoActual, List<EntregaEvent> collector, ExecutionContext contexto) {
@@ -932,7 +932,6 @@ public class OrchestratorService {
 
                 // 3. El movimiento hacia el vecino está bloqueado si el vecino está bloqueado...
                 boolean movimientoBloqueado = isBlockedMove(neighborPos.x, neighborPos.y, tiempoLlegadaVecino, estado) ||
-                                            // ...O si el nodo actual está bloqueado Y NO es el punto de partida original.
                                             (isBlockedMove(currentNode.position.x, currentNode.position.y, tiempoLlegadaVecino, estado) && !enElPuntoDePartidaOriginal);
 
                 // 4. La condición final completa para ignorar un vecino:

@@ -21,18 +21,15 @@ public class EventPublisherService {
     public void publicarEventoOperacion(EventDTO evento) {
         String topic = "/topic/operations";
         messagingTemplate.convertAndSend(topic, evento);
-        System.out.println("Publicado evento en " + topic + ": " + evento);
     }
 
     public void publicarEventoSimulacion(String simulationId, EventDTO evento) {
         if ("operational".equals(simulationId)) {
             String topic = "/topic/operations";
             messagingTemplate.convertAndSend(topic, evento);
-            System.out.println("Publicado evento en " + topic + ": " + evento);
         } else {
             String destino = "/topic/simulation/" + simulationId;
             messagingTemplate.convertAndSend(destino, evento);
-            System.out.println("Publicado evento en " + destino + ": " + evento);
         }
     }
 }
