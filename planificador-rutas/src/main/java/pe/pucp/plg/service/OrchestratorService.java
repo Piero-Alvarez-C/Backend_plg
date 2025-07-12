@@ -924,9 +924,19 @@ public class OrchestratorService {
             for (Point neighborPos : getNeighbors(currentNode.position)) {
                 LocalDateTime tiempoLlegadaVecino = startTime.plusMinutes(currentNode.gCost + 1);
 
-                if (closedSet.contains(neighborPos) || 
-                    isBlockedMove(neighborPos.x, neighborPos.y, tiempoLlegadaVecino, estado) ||
-                    isBlockedMove(currentNode.position.x, currentNode.position.y, tiempoLlegadaVecino, estado)) {
+                // 1. ¿El vecino que estamos evaluando es el destino final?
+                boolean esDestinoFinal = neighborPos.equals(end);
+                
+                // 2. ¿El nodo que estamos expandiendo es el punto de partida original de esta búsqueda?
+                boolean enElPuntoDePartidaOriginal = currentNode.position.equals(start);
+
+                // 3. El movimiento hacia el vecino está bloqueado si el vecino está bloqueado...
+                boolean movimientoBloqueado = isBlockedMove(neighborPos.x, neighborPos.y, tiempoLlegadaVecino, estado) ||
+                                            // ...O si el nodo actual está bloqueado Y NO es el punto de partida original.
+                                            (isBlockedMove(currentNode.position.x, currentNode.position.y, tiempoLlegadaVecino, estado) && !enElPuntoDePartidaOriginal);
+
+                // 4. La condición final completa para ignorar un vecino:
+                if (closedSet.contains(neighborPos) || (movimientoBloqueado && !esDestinoFinal)) {
                     continue;
                 }
 
