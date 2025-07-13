@@ -6,16 +6,16 @@ import org.springframework.stereotype.Service;
 import pe.pucp.plg.factory.FlotaFactory;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
 import pe.pucp.plg.repository.PedidoRepository;
-import java.time.LocalDateTime;
-import java.util.NavigableMap;
-import java.util.TreeMap;
+import pe.pucp.plg.util.ResourceLoader;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
+
 import java.util.stream.Collectors;
 
 @Service
@@ -50,26 +50,50 @@ public class SimulationManagerService {
         this.operationalContext.setCamiones(flotaFactory.crearNuevaFlota());
 
         // 2. Initialize Tanques
-        this.operationalContext.setTanques(tanqueService.inicializarTanques()); 
+        this.operationalContext.setTanques(tanqueService.inicializarTanques());
 
-        // 3. Initialize Pedidos from PedidoRepository
-        LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);
-        List<Pedido> todosLosPedidos = pedidoRepository.getAll(); // Assuming findAll() exists
+        // 3. Initialize Pedidos from ResourceLoader
+        LocalDateTime startTime = LocalDateTime.now();  // Fecha y hora actual precisa al momento de iniciar
+        List<Pedido> todosLosPedidos = ResourceLoader.cargarPedidosParaFecha(LocalDate.from(startTime));
+        System.out.println("Cantidad de pedidos totales operacional: " + todosLosPedidos.size());
+
+
+        // Filtrar pedidos que tengan tiempoCreacion igual o posterior a startTime (incluyendo hora)
         NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
-            .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
+                .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
+                .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
+        System.out.println("Total de pedidos para completar el  día: " + pedidosPorTiempo.size());
+        for (Map.Entry<LocalDateTime, List<Pedido>> entry : pedidosPorTiempo.entrySet()) {
+            LocalDateTime fechaHora = entry.getKey();
+            List<Pedido> pedidos = entry.getValue();
+
+            System.out.println("Fecha y hora: " + fechaHora);
+            System.out.println("Pedidos:");
+
+            for (Pedido p : pedidos) {
+                System.out.println("\tPedido en ubicación (" + p.getX() + ", " + p.getY() + "), volumen: " + p.getVolumen());
+            }
+        }
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
-        
+
+        // Pedidos exactamente en startTime (mismo instante)
         List<Pedido> initialPedidos = todosLosPedidos.stream()
-            .filter(p -> p.getTiempoCreacion().equals(startTime))
-            .collect(Collectors.toList());
-        this.operationalContext.setPedidos(new ArrayList<>(initialPedidos)); 
-        
-        // 4. Initialize Bloqueos from BloqueoRepository
-        this.operationalContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
-        
+                .filter(p -> p.getTiempoCreacion().equals(startTime))
+                .collect(Collectors.toList());
+        this.operationalContext.setPedidos(new ArrayList<>(initialPedidos));
+
+        // 4. Initialize Bloqueos from ResourceLoader
+        for (Bloqueo b : ResourceLoader.cargarBloqueosParaFecha(LocalDate.from(startTime))) {
+            this.operationalContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+            this.operationalContext.getBloqueosPorDia().add(b);
+        }
+
         // 5. Set initial simulation time for operational context
-        this.operationalContext.setCurrentTime(LocalDateTime.of(2025, 1, 1, 0, 0));
+        this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
+        this.operationalContext.setCurrentTime(startTime.minusMinutes(1));                     // fecha y hora
+
+        this.operationalContext.setIgnorarColapso(true);
+
         // depositoX, depositoY have default values in ExecutionContext.
         // Other lists like averias, eventosEntrega, rutas will be empty initially.
     }
@@ -88,7 +112,7 @@ public class SimulationManagerService {
      * and this method should clone the operationalContext instead.
      * @return The ID of the newly created simulation context.
      */
-    public String crearContextoSimulacion() {
+    public String crearContextoSimulacion(boolean esColapso) {
         if(activeSimulationContext != null) {
             throw new IllegalStateException("Ya hay una simulación activa con ID: " + activeSimulationId + ". No se puede crear otra.");
         }
@@ -113,8 +137,14 @@ public class SimulationManagerService {
         this.activeSimulationContext.setPedidos(new ArrayList<>(initialPedidos));
         
         // Initialize Bloqueos from BloqueoRepository for the new simulation context
-        this.activeSimulationContext.setBloqueos(bloqueoRepository.getBloqueos()); // Assuming findAll() exists
+        for (Bloqueo b : bloqueoRepository.getBloqueos()) { // Assuming findAll() exists
+            this.activeSimulationContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+            this.activeSimulationContext.getBloqueosPorDia().add(b);
+        }
         this.activeSimulationContext.setCurrentTime(startTime); // Simulations typically start from t=0
+
+        // Para gestionar el colapso necesitamos una flag
+        this.activeSimulationContext.setIgnorarColapso(!esColapso);
 
         return this.activeSimulationId;
     }

@@ -11,6 +11,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Value("${cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins;
 
+    @SuppressWarnings("null")
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**") // ← aplica a todos los endpoints

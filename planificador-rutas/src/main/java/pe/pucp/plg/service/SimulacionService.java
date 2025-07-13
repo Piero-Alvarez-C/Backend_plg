@@ -2,11 +2,9 @@ package pe.pucp.plg.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Averia;
-
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
@@ -57,7 +55,6 @@ public class SimulacionService {
     }
     
 
-
     /**
      * Inicia una simulación basada en los parámetros de la solicitud.
      * @param request La solicitud con los parámetros de simulación
@@ -71,7 +68,7 @@ public class SimulacionService {
     public SimulationStatusDTO iniciarSimulacion(SimulationRequest request) {
         try {
             // 1. Crear el contexto
-            String simulationId = simulationManagerService.crearContextoSimulacion();
+            String simulationId = simulationManagerService.crearContextoSimulacion(request.isEsColapso());
             EventDTO eventoInicio = EventDTO.of(EventType.SIMULATION_STARTED, null); // No payload necesario o poner info básica
             eventPublisher.publicarEventoSimulacion(simulationId, eventoInicio);
 
@@ -88,8 +85,8 @@ public class SimulacionService {
             
             // 3. Convertir la fecha de inicio a LocalDate
             LocalDate fechaInicio = LocalDate.parse(request.getFechaInicio(), DateTimeFormatter.ISO_LOCAL_DATE);
-            currentSimContext.setFechaInicio(fechaInicio); // Asumimos que este campo existe o lo crearemos después
-            currentSimContext.setDuracionDias(request.getDuracionDias()); // Asumimos que este campo existe
+            currentSimContext.setFechaInicio(fechaInicio); 
+            currentSimContext.setDuracionDias(request.getDuracionDias()); 
             
             // 4. Cargar pedidos y bloqueos para el primer día
             List<Pedido> pedidosDiaUno = ResourceLoader.cargarPedidosParaFecha(fechaInicio);
@@ -113,10 +110,16 @@ public class SimulacionService {
             }
             
             // 7. Establecer los bloqueos iniciales
-            currentSimContext.setBloqueos(bloqueosDiaUno);
+
+            for (Bloqueo b : bloqueosDiaUno) {
+                currentSimContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
+                currentSimContext.getBloqueosPorDia().add(b);
+            }
+
             // 7b. Cargar averías y asignarlas al contexto
             currentSimContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
-            
+
+
             // 8. Inicializar las estructuras de datos necesarias
             currentSimContext.getEventosEntrega().clear();
             currentSimContext.getAveriasAplicadas().clear();
@@ -137,7 +140,6 @@ public class SimulacionService {
             throw new RuntimeException("Error al iniciar simulación con request: " + e.getMessage(), e);
         }
     }
-
 
     /**
      * Obtiene el tiempo actual de una simulación específica.
@@ -215,13 +217,18 @@ public class SimulacionService {
                                   " hasta " + fechaFin);
                 
                 // Ejecutar la simulación hasta que se alcance la fecha final
-                while (context.getCurrentTime().isBefore(fechaFin)) {
+                while (simulationManagerService.getActiveSimulationContext() != null && context.getCurrentTime().isBefore(fechaFin)) {
                     while(controlState.isPaused()) {
                         Thread.sleep(300);
                     }
 
-                    orchestratorService.stepOneMinute(simulationId);
-                    
+                    LocalDateTime colapsed = orchestratorService.stepOneMinute(context, simulationId);
+
+                    // Si retorna null, es que ha colapsado
+                    if (colapsed == null) {
+                        detenerYLimpiarSimulacion(simulationId);
+                    }
+
                     Thread.sleep(controlState.getStepDelayMs());
                 }
                 

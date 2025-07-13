@@ -15,8 +15,8 @@ public class CamionEstado {
         AVAILABLE,      // Disponible para nuevas asignaciones
         DELIVERING,     // En ruta para descargar o recargar
         RETURNING,      // Regresando al depósito o a un tanque
-        PROCESSING,      // Procesando un pedido
-        BREAKDOWN       // En avería
+        UNAVAILABLE,      // Procesando un pedido
+        BREAKDOWN       
     }
 
     // === Referencia a la plantilla ===
@@ -29,7 +29,12 @@ public class CamionEstado {
     // --- Posición y timing ---
     private int x = 12;
     private int y = 8;
-    private LocalDateTime tiempoLibre; 
+    private LocalDateTime tiempoLibre;
+    /**
+     * Tiempo hasta el que el camión permanecerá inactivo exclusivamente por una avería.
+     * Se mantiene separado de tiempoLibre (recargas/servicios programados).
+     */
+    private LocalDateTime tiempoLibreAveria; 
     private LocalDateTime tiempoInicioAveria; // Nuevo: instante en que inicia la avería
     private boolean enRetorno = false; 
     private TruckStatus status = TruckStatus.AVAILABLE;
@@ -39,6 +44,11 @@ public class CamionEstado {
     private List<Point> rutaActual = new ArrayList<>();
     private int pasoActual = 0;      
     private List<Point> history = new ArrayList<>();
+    
+    // --- Desvios ---
+    private List<Point> rutaBackup = new ArrayList<>();
+    private List<Pedido> pedidosBackup = new ArrayList<>();
+    private Pedido pedidoDesvio = null;
 
     // --- Estadísticas de consumo ---
     private double consumoAcumulado = 0.0;
@@ -69,7 +79,8 @@ public class CamionEstado {
         this.pasoActual = 0;
         this.reabastecerEnTanque = null;
         this.status = TruckStatus.AVAILABLE; 
-        this.tiempoLibre = null; 
+        this.tiempoLibre = null;
+        this.tiempoLibreAveria = null; 
     }
 
     public CamionEstado(CamionEstado original) {
@@ -90,9 +101,10 @@ public class CamionEstado {
         this.reabastecerEnTanque = (original.reabastecerEnTanque != null) ? new TanqueDinamico(original.reabastecerEnTanque) : null;
         this.status = original.status;
         this.tiempoLibre = original.tiempoLibre;
+        this.tiempoLibreAveria = original.tiempoLibreAveria;
         this.tipoAveriaActual = original.tipoAveriaActual;
     }
-
+    
     // Getters
     public CamionTemplate getPlantilla() { return plantilla; }
     public int getX() { return x; }
@@ -105,6 +117,8 @@ public class CamionEstado {
     public TanqueDinamico getTanqueDestinoRecarga() { return reabastecerEnTanque; } // Alias for getTanqueDestinoRuta
     public TruckStatus getStatus() { return status; }
     public LocalDateTime getTiempoLibre() { return tiempoLibre; }
+    public LocalDateTime getTiempoLibreAveria() { return tiempoLibreAveria; }
+    public void setTiempoLibreAveria(LocalDateTime nuevo) { this.tiempoLibreAveria = nuevo; }
     public LocalDateTime getRetHora() { return retHora; }
     public int getRetStartX() { return retStartX; }
     public int getRetStartY() { return retStartY; }
@@ -117,6 +131,10 @@ public class CamionEstado {
     public String getTipoAveriaActual() { return tipoAveriaActual; }
     public boolean isEnTaller() { return enTaller; }
 
+    public List<Point> getRutaBackup() { return rutaBackup; }
+    public List<Pedido> getPedidosBackup() { return pedidosBackup; }
+    public Pedido getPedidoDesvio() { return pedidoDesvio; }
+
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
     public void setCombustibleDisponible(double nuevoCombustible) { this.combustibleActual = nuevoCombustible; }
@@ -124,10 +142,7 @@ public class CamionEstado {
     public void setX(int x) { this.x = x; }
     public void setY(int y) { this.y = y; }   
     public void setStatus(TruckStatus newStatus) { this.status = newStatus; }
-    public void setRuta(List<Point> nuevaRuta) {
-        this.rutaActual = new ArrayList<>(nuevaRuta);
-        this.pasoActual = 0; // Reset to start of the new route
-    }
+    public void setRuta(List<Point> nuevaRuta) { this.rutaActual = new ArrayList<>(nuevaRuta); }
     public void setPasoActual(int nuevoPaso) { this.pasoActual = nuevoPaso; }
     public void setReabastecerEnTanque(TanqueDinamico tanque) { this.reabastecerEnTanque = tanque; }
     public void setRetHora(LocalDateTime hora) { this.retHora = hora; }
@@ -141,9 +156,19 @@ public class CamionEstado {
     public void setTipoAveriaActual(String tipo) { this.tipoAveriaActual = tipo; }
     public void setEnTaller(boolean enTaller) { this.enTaller = enTaller; }
 
+    public void setRutaBackup(List<Point> r) { this.rutaBackup = r; }
+    public void setPedidosBackup(List<Pedido> p) { this.pedidosBackup = p; }
+    public void setPedidoDesvio(Pedido d) { this.pedidoDesvio = d; }
+
+    public void clearDesvio() {
+        this.rutaBackup = null;
+        this.pedidosBackup = null;
+        this.pedidoDesvio = null;
+    }
+
     // --- Checkers ---
     public boolean tienePasosPendientes() {
-        return pasoActual < rutaActual.size();
+        return !rutaActual.isEmpty();
     }
 
     public void registrarCargaPedido(Pedido p) { 
@@ -153,17 +178,18 @@ public class CamionEstado {
     }    
 
     public boolean tieneRutaAsignada() {
-        return pasoActual != -1 && !rutaActual.isEmpty();
+        return !rutaActual.isEmpty();
     }
     
     public boolean estaEnDestinoDeRuta() {
         if (!tieneRutaAsignada()) return true;
-        return pasoActual >= rutaActual.size();
+        return rutaActual.isEmpty();
     }
 
     public boolean estaLibre(LocalDateTime tiempoActual) {
-        return (this.status == TruckStatus.AVAILABLE) && 
-               (this.tiempoLibre == null || !this.tiempoLibre.isAfter(tiempoActual));
+        return (this.status == TruckStatus.AVAILABLE)
+           && (this.tiempoLibre == null || !this.tiempoLibre.isAfter(tiempoActual))
+           && (this.tiempoLibreAveria == null || !this.tiempoLibreAveria.isAfter(tiempoActual));
     }
 
     public void recargarCombustible() { 
@@ -172,21 +198,22 @@ public class CamionEstado {
 
     public void avanzarUnPaso() {
         if (!tienePasosPendientes()) return;
-        getPlantilla();
+
+        pasoActual++; // ¡Incrementar el contador de pasos!
+
         double pesoTotal = CamionTemplate.getPesoTara() + (getCapacidadDisponible() * CamionTemplate.getPesoCargoPorM3());
-        double gasto = pesoTotal / 180.0;
-        consumoAcumulado += gasto;
-        combustibleActual -= gasto ;
-        combustibleGastado += gasto;
-        Point next = rutaActual.get(pasoActual);
-        pasoActual++;
-        moverA(next);
-    }
+    double gasto = pesoTotal / 180.0;
+    consumoAcumulado += gasto;
+    combustibleActual -= gasto ;
+    combustibleGastado += gasto;
+    Point next = rutaActual.remove(0);
+    moverA(next);
+}
 
     public void moverA(Point p) {
         x = p.x;
         y = p.y;
-        history.add(new Point(p.x, p.y));
+        //history.add(new Point(p.x, p.y));
     }
 
     public void reset() {
@@ -199,10 +226,10 @@ public class CamionEstado {
         pedidosCargados.clear();
         rutaActual = Collections.emptyList();
         history.clear();
-        pasoActual = 0;
         reabastecerEnTanque = null;
         status = TruckStatus.AVAILABLE;
         tiempoLibre = null;
+        tiempoLibreAveria = null;
         enRetorno = false;
         enTaller = false; // Reiniciar estado de taller
     }
@@ -211,10 +238,4 @@ public class CamionEstado {
         return new CamionEstado(this);
     }
 
-    public void appendToHistory(List<Point> path) {
-        if (history.isEmpty())
-            history.add(new Point(x, y));
-        if (path != null)
-            history.addAll(path);
-    }
 }

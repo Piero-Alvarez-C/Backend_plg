@@ -116,5 +116,5 @@ public class SimulacionController {
         return ResponseEntity.ok(MapperUtil.toAveriaDTO(nuevaAveria));
     }
 
-    
+
 }
