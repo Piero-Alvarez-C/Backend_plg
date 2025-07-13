@@ -30,7 +30,7 @@ public class OrchestratorService {
     private final EventPublisherService eventPublisher;
 
     private static final int TIEMPO_SERVICIO = 15; 
-    private static final int INTERVALO_REPLAN = 20;
+    private static final int INTERVALO_REPLAN = 40;
     private static final int UMBRAL_VENCIMIENTO = 60;
 
     private int countReplan;
@@ -247,6 +247,7 @@ public class OrchestratorService {
 
         if (!pedidosAInyectar.isEmpty()) replanificar = true;
         if (countReplan == INTERVALO_REPLAN) {
+            System.out.println("Replanificando");   
             replanificar = true;
             countReplan = 0;
         }
@@ -264,7 +265,7 @@ public class OrchestratorService {
         boolean haColapsado = false;
         while (itP.hasNext()) {
             Pedido p = itP.next();
-            if (!p.isAtendido() && !p.isDescartado() && tiempoActual.isAfter(p.getTiempoLimite())) {
+            if (!p.isAtendido() && !p.isDescartado() && !p.isEnEntrega() && (tiempoActual.isAfter(p.getTiempoLimite().plusMinutes(2)) || tiempoActual.isAfter(p.getTiempoLimite()))) {
                 /*System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
                         tiempoActual, p.getId());*/
                 // Marca y elimina para no repetir el colapso
@@ -276,7 +277,7 @@ public class OrchestratorService {
         // COLAPSO
         if(haColapsado && !contexto.isIgnorarColapso()) {
             // Si ha colapsado y no se ignora, destruir la simulacion
-            System.out.printf("💥 Colapso detectado en t+%d, finalizando simulación%n", tiempoActual);
+            System.out.printf("💥 Colapso detectado en %s, finalizando simulación%n", tiempoActual);
             eventPublisher.publicarEventoSimulacion(simulationId, EventDTO.of(EventType.SIMULATION_COLLAPSED, null));
             return null;
         }
@@ -297,8 +298,10 @@ public class OrchestratorService {
                 .collect(Collectors.toList());
 
         if (replanificar && flotaEstado.isEmpty()) {
-            /*System.out.printf("⏲️ t+%d: Ningún camión disponible (ni en ventana) → replanificación pospuesta%n",
-                    tiempoActual);*/
+            if(flotaEstado.isEmpty()) {
+                System.out.printf("Ningún camión disponible (ni en ventana) → replanificación pospuesta%n",
+                                    tiempoActual);
+            }
             replanificar = false;
         }
 
@@ -326,6 +329,7 @@ public class OrchestratorService {
                 p.setHoraEntregaProgramada(null);
                 });
 
+            //candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
             // B) Desvío local con búsqueda del mejor camión
             List<Pedido> sinAsignar = new ArrayList<>();
             for (Pedido p : candidatos) {
@@ -337,8 +341,14 @@ public class OrchestratorService {
                     if (c.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
                     if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
-                        mejor = c;
-                        mejorDist = dist;
+                        //if(p.getTiempoLimite() == null || c.getPedidosCargados().size() == 0) {
+                            mejor = c;
+                            mejorDist = dist;
+                        //} //else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
+                            //mejor = c;
+                            //mejorDist = dist;   
+                        //}
+                        
                     }
                 }
                 if (mejor != null) {
@@ -381,6 +391,19 @@ public class OrchestratorService {
                     }
                     // B) Si ya está DELIVERING → replan parcial
                     else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+
+                        // SI ESTABA RETURNING
+                        if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
+                            for(TanqueDinamico t : contexto.getTanques()) {
+                                if (t.getPosX() == mejor.getTanqueDestinoRecarga().getPosX() &&
+                                    t.getPosY() == mejor.getTanqueDestinoRecarga().getPosY()) {
+                                    t.setDisponible(t.getDisponible() + mejor.getPlantilla().getCapacidadCarga() - mejor.getCapacidadDisponible());
+                                    break;
+                                }
+                            }
+                            mejor.setEnRetorno(false);
+                            mejor.setReabastecerEnTanque(null);
+                        }
                         // calcular camino al desvío
                         List<Point> caminoDesvio = buildManhattanPath(
                                 mejor.getX(), mejor.getY(),
@@ -495,6 +518,7 @@ public class OrchestratorService {
                 camion.setX(pedido.getX());
                 camion.setY(pedido.getY());
                 camion.setStatus(CamionEstado.TruckStatus.UNAVAILABLE); // Ocupado durante el servicio
+                pedido.setEnEntrega(true);
                 
                 // Se agenda el evento de "Fin de Servicio" para más tarde
                 LocalDateTime finServicio = tiempoActual.plusMinutes(TIEMPO_SERVICIO);
@@ -510,6 +534,7 @@ public class OrchestratorService {
                 pedido.setAtendido(true); 
                 // Eliminar pedido de la lista de pedidos
                 contexto.getPedidos().remove(pedido);
+                camion.clearDesvio();
                 camion.setStatus(CamionEstado.TruckStatus.AVAILABLE); // Vuelve a estar disponible
                 
                 camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
@@ -558,8 +583,6 @@ public class OrchestratorService {
         // añadir todos los eventos recién creados
         contexto.getEventosEntrega().addAll(nuevosEventos);
     }
-
-
 
     // helper: inicia retorno y programa el evento de llegada
     private void startReturn(CamionEstado c, LocalDateTime tiempoActual, List<EntregaEvent> collector, ExecutionContext contexto) {
@@ -773,6 +796,13 @@ public class OrchestratorService {
             if (deliveringOrReturning) {
                 // 1) Si venía retornando, cancela el evento de retorno y limpia estado
                 if (camion.getStatus() == CamionEstado.TruckStatus.RETURNING) {
+                    for(TanqueDinamico t : contexto.getTanques()) {
+                        if (t.getPosX() == camion.getTanqueDestinoRecarga().getPosX() &&
+                            t.getPosY() == camion.getTanqueDestinoRecarga().getPosY()) {
+                            t.setDisponible(t.getDisponible() + camion.getPlantilla().getCapacidadCarga() - camion.getCapacidadDisponible());
+                            break;
+                        }
+                    }
                     contexto.getEventosEntrega()
                             .removeIf(ev -> ev.getCamionId().equals(camion.getPlantilla().getId()) && ev.getPedido() == null);
                     camion.setEnRetorno(false);
@@ -780,6 +810,7 @@ public class OrchestratorService {
                     camion.getRutaActual().clear();
                     camion.setPasoActual(0);
                     camion.getPedidosCargados().clear();
+                    
                     camion.setReabastecerEnTanque(null);
                 }
 
@@ -931,7 +962,6 @@ public class OrchestratorService {
 
                 // 3. El movimiento hacia el vecino está bloqueado si el vecino está bloqueado...
                 boolean movimientoBloqueado = isBlockedMove(neighborPos.x, neighborPos.y, tiempoLlegadaVecino, estado) ||
-                                            // ...O si el nodo actual está bloqueado Y NO es el punto de partida original.
                                             (isBlockedMove(currentNode.position.x, currentNode.position.y, tiempoLlegadaVecino, estado) && !enElPuntoDePartidaOriginal);
 
                 // 4. La condición final completa para ignorar un vecino:

@@ -161,6 +161,11 @@ public class SimulationManagerService {
             this.activeSimulationControlState = null;
             System.out.println("🗑️ Contexto de simulación destruido.");
         }
+        // Destruir tambien el control state
+        if (this.activeSimulationControlState != null) {
+            this.activeSimulationControlState.setPaused(false);
+            this.activeSimulationControlState = null;
+        }
     }
 
     public SimulationControlState getActiveSimulationControlState() {

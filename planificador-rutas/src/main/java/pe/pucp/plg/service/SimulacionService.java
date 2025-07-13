@@ -195,6 +195,7 @@ public class SimulacionService {
 
         // Ejecutar la simulación en un hilo separado
         this.activeSimulationTask = CompletableFuture.runAsync(() -> {
+            boolean simulacionColapso = false; 
             try {
                 ExecutionContext context = simulationManagerService.getActiveSimulationContext();
                 SimulationControlState controlState = simulationManagerService.getActiveSimulationControlState();
@@ -226,15 +227,18 @@ public class SimulacionService {
 
                     // Si retorna null, es que ha colapsado
                     if (colapsed == null) {
-                        detenerYLimpiarSimulacion(simulationId);
+                        simulacionColapso = true;
+                        break;
                     }
 
                     Thread.sleep(controlState.getStepDelayMs());
                 }
                 
                 // Publicar evento de fin de simulación
-                eventPublisher.publicarEventoSimulacion(simulationId, 
-                    EventDTO.of(EventType.SIMULATION_COMPLETED, null));
+                if(!simulacionColapso) {
+                    eventPublisher.publicarEventoSimulacion(simulationId, 
+                        EventDTO.of(EventType.SIMULATION_COMPLETED, null));
+                }
                 
                 System.out.println("Simulación " + simulationId + " completada hasta " + context.getCurrentTime());
             } catch (Exception e) {
