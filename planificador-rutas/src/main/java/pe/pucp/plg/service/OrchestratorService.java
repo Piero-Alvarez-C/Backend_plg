@@ -28,7 +28,7 @@ public class OrchestratorService {
     private final EventPublisherService eventPublisher;
 
     private static final int TIEMPO_SERVICIO = 15; 
-    private static final int INTERVALO_REPLAN = 20;
+    private static final int INTERVALO_REPLAN = 40;
     private static final int UMBRAL_VENCIMIENTO = 60;
 
     private int countReplan;
@@ -340,7 +340,7 @@ public class OrchestratorService {
                 p.setHoraEntregaProgramada(null);
                 });
 
-            candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
+            //candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
             // B) Desvío local con búsqueda del mejor camión
             List<Pedido> sinAsignar = new ArrayList<>();
             for (Pedido p : candidatos) {
@@ -352,13 +352,13 @@ public class OrchestratorService {
                     if (c.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
                     if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
-                        if(p.getTiempoLimite() == null || c.getPedidosCargados().size() == 0) {
+                        //if(p.getTiempoLimite() == null || c.getPedidosCargados().size() == 0) {
                             mejor = c;
                             mejorDist = dist;
-                        } else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
-                            mejor = c;
-                            mejorDist = dist;   
-                        }
+                        //} //else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
+                            //mejor = c;
+                            //mejorDist = dist;   
+                        //}
                         
                     }
                 }
@@ -402,6 +402,19 @@ public class OrchestratorService {
                     }
                     // B) Si ya está DELIVERING → replan parcial
                     else {
+                        // SI ESTABA RETURNING
+                        if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
+                            for(TanqueDinamico t : contexto.getTanques()) {
+                                if (t.getPosX() == mejor.getTanqueDestinoRecarga().getPosX() &&
+                                    t.getPosY() == mejor.getTanqueDestinoRecarga().getPosY()) {
+                                    t.setDisponible(t.getDisponible() + mejor.getPlantilla().getCapacidadCarga() - mejor.getCapacidadDisponible());
+                                    break;
+                                }
+                            }
+                            mejor.setEnRetorno(false);
+                            mejor.setReabastecerEnTanque(null);
+                        }
+
                         // calcular camino al desvío
                         List<Point> caminoDesvio = buildManhattanPath(
                                 mejor.getX(), mejor.getY(),
@@ -793,7 +806,6 @@ public class OrchestratorService {
                             break;
                         }
                     }
-                    
                     contexto.getEventosEntrega()
                             .removeIf(ev -> ev.getCamionId().equals(camion.getPlantilla().getId()) && ev.getPedido() == null);
                     camion.setEnRetorno(false);
