@@ -4,6 +4,7 @@ import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.EntregaEvent;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.state.TanqueDinamico;
 
@@ -37,13 +38,16 @@ public class ExecutionContext {
     private NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo = new TreeMap<>();
 
     // 7) Averías por turno: ("T1"|"T2"|"T3") + camiónId → tipoAvería
-    private Map<String, Map<String, String>> averiasPorTurno = new HashMap<>();
+    private Map<String, Map<String, Averia>> averiasPorTurno = new HashMap<>();
 
     // 8) Conjunto de IDs de averías aplicadas en el turno actual
     private Set<String> averiasAplicadas = new HashSet<>();
 
     // 9) IDs de camiones inhabilitados actualmente
     private Set<String> camionesInhabilitados = new HashSet<>();
+
+    // 9.1) Puntos de avería para camiones: idCamion_turno -> paso donde ocurrirá la avería
+    private Map<String, Integer> puntosAveria = new HashMap<>();
 
     // 10) Depósito principal (coordenadas)
     private int depositoX = 12, depositoY = 8;
@@ -97,14 +101,17 @@ public class ExecutionContext {
     public NavigableMap<LocalDateTime, List<Pedido>> getPedidosPorTiempo() { return pedidosPorTiempo; }
     public void setPedidosPorTiempo(NavigableMap<LocalDateTime, List<Pedido>> pedidosPorTiempo) { this.pedidosPorTiempo = pedidosPorTiempo; }
 
-    public Map<String, Map<String, String>> getAveriasPorTurno() { return averiasPorTurno; }
-    public void setAveriasPorTurno(Map<String, Map<String, String>> averiasPorTurno) { this.averiasPorTurno = averiasPorTurno; }
+    public Map<String, Map<String, Averia>> getAveriasPorTurno() { return averiasPorTurno; }
+    public void setAveriasPorTurno(Map<String, Map<String, Averia>> averiasPorTurno) { this.averiasPorTurno = averiasPorTurno; }
 
     public Set<String> getAveriasAplicadas() { return averiasAplicadas; }
     public void setAveriasAplicadas(Set<String> averiasAplicadas) { this.averiasAplicadas = averiasAplicadas; }
 
     public Set<String> getCamionesInhabilitados() { return camionesInhabilitados; }
     public void setCamionesInhabilitados(Set<String> camionesInhabilitados) { this.camionesInhabilitados = camionesInhabilitados; }
+
+    public Map<String, Integer> getPuntosAveria() { return puntosAveria; }
+    public void setPuntosAveria(Map<String, Integer> puntosAveria) { this.puntosAveria = puntosAveria; }
 
     public int getDepositoX() { return depositoX; }
     public void setDepositoX(int depositoX) { this.depositoX = depositoX; }

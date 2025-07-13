@@ -15,7 +15,8 @@ public class CamionEstado {
         AVAILABLE,      // Disponible para nuevas asignaciones
         DELIVERING,     // En ruta para descargar o recargar
         RETURNING,      // Regresando al depósito o a un tanque
-        UNAVAILABLE      // Procesando un pedido
+        UNAVAILABLE,      // Procesando un pedido
+        BREAKDOWN       
     }
 
     // === Referencia a la plantilla ===
@@ -28,7 +29,13 @@ public class CamionEstado {
     // --- Posición y timing ---
     private int x = 12;
     private int y = 8;
-    private LocalDateTime tiempoLibre; 
+    private LocalDateTime tiempoLibre;
+    /**
+     * Tiempo hasta el que el camión permanecerá inactivo exclusivamente por una avería.
+     * Se mantiene separado de tiempoLibre (recargas/servicios programados).
+     */
+    private LocalDateTime tiempoLibreAveria; 
+    private LocalDateTime tiempoInicioAveria; // Nuevo: instante en que inicia la avería
     private boolean enRetorno = false; 
     private TruckStatus status = TruckStatus.AVAILABLE;
 
@@ -47,10 +54,21 @@ public class CamionEstado {
     private double consumoAcumulado = 0.0;
     private double combustibleGastado = 0.0;
 
+    public LocalDateTime getTiempoInicioAveria() {
+        return tiempoInicioAveria;
+    }
+    public void setTiempoInicioAveria(LocalDateTime tiempoInicioAveria) {
+        this.tiempoInicioAveria = tiempoInicioAveria;
+    }
+
     // --- Para recarga en tanque ---
     private TanqueDinamico reabastecerEnTanque = null; 
     private LocalDateTime retHora;
     private int retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
+    
+    // --- Para averías ---
+    private String tipoAveriaActual = null; // T1, T2, T3 o null si no hay avería
+    private boolean enTaller = false; // Indica si el camión está en taller tras una avería tipo T2 o T3
 
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
@@ -61,7 +79,8 @@ public class CamionEstado {
         this.pasoActual = 0;
         this.reabastecerEnTanque = null;
         this.status = TruckStatus.AVAILABLE; 
-        this.tiempoLibre = null; 
+        this.tiempoLibre = null;
+        this.tiempoLibreAveria = null; 
     }
 
     public CamionEstado(CamionEstado original) {
@@ -82,6 +101,8 @@ public class CamionEstado {
         this.reabastecerEnTanque = (original.reabastecerEnTanque != null) ? new TanqueDinamico(original.reabastecerEnTanque) : null;
         this.status = original.status;
         this.tiempoLibre = original.tiempoLibre;
+        this.tiempoLibreAveria = original.tiempoLibreAveria;
+        this.tipoAveriaActual = original.tipoAveriaActual;
     }
     
     // Getters
@@ -96,6 +117,8 @@ public class CamionEstado {
     public TanqueDinamico getTanqueDestinoRecarga() { return reabastecerEnTanque; } // Alias for getTanqueDestinoRuta
     public TruckStatus getStatus() { return status; }
     public LocalDateTime getTiempoLibre() { return tiempoLibre; }
+    public LocalDateTime getTiempoLibreAveria() { return tiempoLibreAveria; }
+    public void setTiempoLibreAveria(LocalDateTime nuevo) { this.tiempoLibreAveria = nuevo; }
     public LocalDateTime getRetHora() { return retHora; }
     public int getRetStartX() { return retStartX; }
     public int getRetStartY() { return retStartY; }
@@ -105,6 +128,8 @@ public class CamionEstado {
     public boolean getEnRetorno() { return enRetorno; }
     public double getConsumoAcumulado() { return consumoAcumulado; }
     public double getCombustibleGastado() { return combustibleGastado; }
+    public String getTipoAveriaActual() { return tipoAveriaActual; }
+    public boolean isEnTaller() { return enTaller; }
 
     public List<Point> getRutaBackup() { return rutaBackup; }
     public List<Pedido> getPedidosBackup() { return pedidosBackup; }
@@ -128,6 +153,8 @@ public class CamionEstado {
     public void setEnRetorno(boolean enRet) { this.enRetorno = enRet; }
     public void setConsumoAcumulado(double consumo) { this.consumoAcumulado = consumo; }
     public void setCombustibleGastado(double combustible) { this.combustibleGastado = combustible; }
+    public void setTipoAveriaActual(String tipo) { this.tipoAveriaActual = tipo; }
+    public void setEnTaller(boolean enTaller) { this.enTaller = enTaller; }
 
     public void setRutaBackup(List<Point> r) { this.rutaBackup = r; }
     public void setPedidosBackup(List<Pedido> p) { this.pedidosBackup = p; }
@@ -160,8 +187,9 @@ public class CamionEstado {
     }
 
     public boolean estaLibre(LocalDateTime tiempoActual) {
-        return (this.status == TruckStatus.AVAILABLE) && 
-               (this.tiempoLibre == null || !this.tiempoLibre.isAfter(tiempoActual));
+        return (this.status == TruckStatus.AVAILABLE)
+           && (this.tiempoLibre == null || !this.tiempoLibre.isAfter(tiempoActual))
+           && (this.tiempoLibreAveria == null || !this.tiempoLibreAveria.isAfter(tiempoActual));
     }
 
     public void recargarCombustible() { 
@@ -170,15 +198,17 @@ public class CamionEstado {
 
     public void avanzarUnPaso() {
         if (!tienePasosPendientes()) return;
-        getPlantilla();
+
+        pasoActual++; // ¡Incrementar el contador de pasos!
+
         double pesoTotal = CamionTemplate.getPesoTara() + (getCapacidadDisponible() * CamionTemplate.getPesoCargoPorM3());
-        double gasto = pesoTotal / 180.0;
-        consumoAcumulado += gasto;
-        combustibleActual -= gasto ;
-        combustibleGastado += gasto;
-        Point next = rutaActual.remove(0);
-        moverA(next);
-    }
+    double gasto = pesoTotal / 180.0;
+    consumoAcumulado += gasto;
+    combustibleActual -= gasto ;
+    combustibleGastado += gasto;
+    Point next = rutaActual.remove(0);
+    moverA(next);
+}
 
     public void moverA(Point p) {
         x = p.x;
@@ -199,7 +229,9 @@ public class CamionEstado {
         reabastecerEnTanque = null;
         status = TruckStatus.AVAILABLE;
         tiempoLibre = null;
+        tiempoLibreAveria = null;
         enRetorno = false;
+        enTaller = false; // Reiniciar estado de taller
     }
 
     public CamionEstado deepClone() {

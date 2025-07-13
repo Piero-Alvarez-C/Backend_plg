@@ -4,6 +4,7 @@ import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Mantenimiento;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.service.Impl.BloqueoServiceImpl;
+import pe.pucp.plg.model.common.Averia;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -78,8 +79,8 @@ public class ParseadorArchivos {
                 ));
     }
 
-    public static Map<String, Map<String, String>> parsearAverias(String contenido) {
-        Map<String, Map<String, String>> resultado = new HashMap<>();
+    public static Map<String, Map<String, Averia>> parsearAverias(String contenido) {
+        Map<String, Map<String, Averia>> resultado = new HashMap<>();
 
         for (String linea : contenido.split("\\R")) {
             if (linea.isBlank()) continue;
@@ -95,9 +96,11 @@ public class ParseadorArchivos {
                 String camionId = partes[1].trim();      // CAM001, etc.
                 String tipoIncidente = partes[2].trim(); // TI1, TI2, etc.
 
+                Averia averia = new Averia(turno, camionId, tipoIncidente, true);
+
                 resultado
                         .computeIfAbsent(turno, k -> new HashMap<>())
-                        .put(camionId, tipoIncidente);
+                        .put(camionId, averia);
 
             } catch (Exception e) {
                 System.err.println("❌ Error parseando avería: " + linea + " → " + e.getMessage());

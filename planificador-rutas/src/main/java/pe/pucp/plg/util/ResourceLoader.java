@@ -2,6 +2,8 @@ package pe.pucp.plg.util;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.FileCopyUtils;
+
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 
@@ -12,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 
 /**
@@ -123,6 +126,21 @@ public class ResourceLoader {
         ClassPathResource resource = new ClassPathResource(nombreArchivo);
         try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
             return FileCopyUtils.copyToString(reader);
+        }
+    }
+
+    /**
+     * Carga el mapa de averías por turno a partir del archivo averias/averias.txt en resources.
+     * Formato de línea esperado: "T1_CAM001_TI1".
+     * @return Mapa turno → (camiónId → tipoIncidente)
+     */
+    public static Map<String, Map<String, Averia>> cargarAverias() {
+        try {
+            String contenido = leerContenidoArchivo("averias.txt");
+            return ParseadorArchivos.parsearAverias(contenido);
+        } catch (IOException e) {
+            System.err.println("Error cargando averías: " + e.getMessage());
+            return Collections.emptyMap();
         }
     }
 }

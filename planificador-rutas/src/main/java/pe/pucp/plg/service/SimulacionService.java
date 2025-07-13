@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
@@ -53,6 +54,7 @@ public class SimulacionService {
         return "operational_context_reset_or_initialized";
     }
     
+
     /**
      * Inicia una simulación basada en los parámetros de la solicitud.
      * @param request La solicitud con los parámetros de simulación
@@ -108,11 +110,16 @@ public class SimulacionService {
             }
             
             // 7. Establecer los bloqueos iniciales
+
             for (Bloqueo b : bloqueosDiaUno) {
                 currentSimContext.getBloqueosPorTiempo().computeIfAbsent(b.getStartTime(), k -> new ArrayList<>()).add(b);
                 currentSimContext.getBloqueosPorDia().add(b);
             }
-            
+
+            // 7b. Cargar averías y asignarlas al contexto
+            currentSimContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
+
+
             // 8. Inicializar las estructuras de datos necesarias
             currentSimContext.getEventosEntrega().clear();
             currentSimContext.getAveriasAplicadas().clear();
@@ -145,6 +152,33 @@ public class SimulacionService {
             throw new IllegalArgumentException("Simulation context not found for ID: " + simulationId);
         }
         return currentContext.getCurrentTime();
+    }          
+
+    /**
+     * Registra una avería para un camión en una simulación específica.
+     * @param simulationId El ID de la simulación
+     * @param dto Los datos de la avería
+     * @return La avería registrada
+     */
+    public Averia registrarAveriaSimulacion(String simulationId, AveriaDTO dto) {
+        try {
+            ExecutionContext contextoActual = simulationManagerService.getActiveSimulationContext();
+            if (contextoActual == null) {
+                throw new IllegalArgumentException("No se encontró el contexto de simulación para el ID: " + simulationId);
+            }
+            String turno = dto.getTurno();
+            String camionId = dto.getCodigoVehiculo();
+            String tipoAveria = dto.getTipoIncidente();
+            Averia nuevaAveria = new Averia(turno, camionId, tipoAveria);
+            contextoActual.getAveriasPorTurno()
+                    .computeIfAbsent(turno, k -> new java.util.HashMap<>())
+                    .put(camionId, nuevaAveria);
+            System.out.println("Camión " + camionId + " marcado con avería: " + tipoAveria + " para el turno " + turno);
+            return nuevaAveria;
+        } catch (Exception e) {
+            System.err.println("Error registrando avería: " + e.getMessage());
+            throw new RuntimeException("Error al registrar avería en simulación con ID: " + simulationId, e);
+        }
     }
     
     /**
