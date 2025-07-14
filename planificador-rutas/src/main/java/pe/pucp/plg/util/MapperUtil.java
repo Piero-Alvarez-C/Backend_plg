@@ -1,6 +1,7 @@
 package pe.pucp.plg.util;
 
 import pe.pucp.plg.dto.*;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
@@ -114,7 +115,20 @@ public class MapperUtil {
                 .map(MapperUtil::toBloqueoDTO).toList());
         s.setTanques(estado.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO).toList());
-        
+                
+        s.setAverias(
+                estado.getAveriasPorTurno().entrySet().stream()
+                        .flatMap(turnoEntry -> turnoEntry.getValue().entrySet().stream()
+                                .map(avEntry -> {
+                                    AveriaDTO dto = new AveriaDTO();
+                                    dto.setTurno(turnoEntry.getKey());
+                                    dto.setCodigoVehiculo(avEntry.getKey());
+                                    dto.setTipoIncidente(avEntry.getValue().getTipoIncidente());
+                                    return dto;
+                                })
+                        ).toList());
+
+
         // For RutaDTO, we now map camionId. If full CamionEstadoDTO is needed here,
         // it would require looking up CamionEstado from ExecutionContext based on camionId.
         // For simplicity, RutaDTO in snapshot will contain camionId.
@@ -122,4 +136,12 @@ public class MapperUtil {
         //        .map(MapperUtil::toRutaDTO).toList());
         return s;
     }
+    public static AveriaDTO toAveriaDTO(Averia averia) {
+        AveriaDTO dto = new AveriaDTO();
+        dto.setTipoIncidente(averia.getTipoIncidente());
+        dto.setTurno(averia.getTurno());
+        dto.setCodigoVehiculo(averia.getCodigoVehiculo());
+        return dto;
+    }
+        
 }

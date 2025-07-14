@@ -88,6 +88,8 @@ public class SimulationManagerService {
             this.operationalContext.getBloqueosPorDia().add(b);
         }
 
+        this.operationalContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
+
         // 5. Set initial simulation time for operational context
         this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
         this.operationalContext.setCurrentTime(startTime.minusMinutes(1));                     // fecha y hora
@@ -160,6 +162,11 @@ public class SimulationManagerService {
             this.activeSimulationId = null;
             this.activeSimulationControlState = null;
             System.out.println("🗑️ Contexto de simulación destruido.");
+        }
+        // Destruir tambien el control state
+        if (this.activeSimulationControlState != null) {
+            this.activeSimulationControlState.setPaused(false);
+            this.activeSimulationControlState = null;
         }
     }
 

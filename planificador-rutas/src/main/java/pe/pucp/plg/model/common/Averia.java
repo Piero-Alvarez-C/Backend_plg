@@ -4,13 +4,24 @@ public class Averia {
     private String turno;           // T1, T2, T3
     private String codigoVehiculo; // Ej: TA01
     private String tipoIncidente;  // TI1, TI2, TI3
+    private boolean fromFile;      // Indica si fue cargada desde archivo
 
-    public Averia() {}
+    public Averia() {
+        this.fromFile = false; // Por defecto, no es de archivo
+    }
 
     public Averia(String turno, String codigoVehiculo, String tipoIncidente) {
         this.turno = turno;
         this.codigoVehiculo = codigoVehiculo;
         this.tipoIncidente = tipoIncidente;
+        this.fromFile = false; // Por defecto, no es de archivo
+    }
+    
+    public Averia(String turno, String codigoVehiculo, String tipoIncidente, boolean fromFile) {
+        this.turno = turno;
+        this.codigoVehiculo = codigoVehiculo;
+        this.tipoIncidente = tipoIncidente;
+        this.fromFile = fromFile;
     }
 
     public String getTurno() {
@@ -35,5 +46,13 @@ public class Averia {
 
     public void setTipoIncidente(String tipoIncidente) {
         this.tipoIncidente = tipoIncidente;
+    }
+    
+    public boolean isFromFile() {
+        return fromFile;
+    }
+    
+    public void setFromFile(boolean fromFile) {
+        this.fromFile = fromFile;
     }
 }

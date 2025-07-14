@@ -4,9 +4,11 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
 import pe.pucp.plg.dto.*;
 import pe.pucp.plg.dto.enums.EventType;
 import pe.pucp.plg.model.common.Pedido;
+import pe.pucp.plg.model.common.Averia;
 import pe.pucp.plg.model.context.ExecutionContext;
 
 import java.util.ArrayList;
@@ -100,30 +102,22 @@ public class OperationService {
      * @param tipoAveria A description or type of the breakdown.
      * @param turno El turno en que ocurrió la avería ("T1", "T2", "T3")
      */
-    public void registrarAveriaCamion(String camionId, String tipoAveria, String turno) {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
+    public Averia registrarAveriaCamion(AveriaDTO dto) {
+        try {
+            ExecutionContext contextoActual = simulationManagerService.getOperationalContext();
+            String turno = dto.getTurno();
+            String camionId = dto.getCodigoVehiculo();
+            String tipoAveria = dto.getTipoIncidente();
+            Averia nuevaAveria = new Averia(turno, camionId, tipoAveria);
+            contextoActual.getAveriasPorTurno()
+                    .computeIfAbsent(turno, k -> new java.util.HashMap<>())
+                    .put(camionId, nuevaAveria);
+            System.out.println("Camión " + camionId + " marcado con avería: " + tipoAveria + " para el turno " + turno);
+            return nuevaAveria;
+        } catch (Exception e) {
+            System.err.println("Error registrando avería: " + e.getMessage());
+            throw new RuntimeException("Error al registrar avería en operación día a día", e);
         }
-
-        operationalContext.getAveriasPorTurno()
-            .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, tipoAveria);
-        
-        // Mark the truck as unavailable if the breakdown is for the current/active turn
-        // This logic might be more complex depending on how turns are managed vs. currentTime
-        // For simplicity, if an averia is registered, we might immediately mark the truck as inhabilitado.
-        operationalContext.getCamionesInhabilitados().add(camionId);
-
-        // Find the CamionEstado and update its status if necessary
-        operationalContext.getCamiones().stream()
-            .filter(c -> c.getPlantilla().getId().equals(camionId))
-            .findFirst()
-            .ifPresent(camion -> {
-                // camion.setStatus(CamionEstado.TruckStatus.OUT_OF_SERVICE); // Or a similar status
-                // Potentially clear its current route, etc.
-                System.out.println("Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
-            });
-        // Potentially trigger re-planning
     }
 
     public List<CamionDTO> getListaCamionesOperacionalesDTO() {
