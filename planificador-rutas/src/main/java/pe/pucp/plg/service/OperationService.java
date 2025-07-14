@@ -40,7 +40,7 @@ public class OperationService {
     }
 
     // Método que se ejecuta periódicamente para avanzar las operaciones día a día
-    @Scheduled(fixedDelay = 10000) // cada 10 segundos fijo CAMBIAR A 60 SEGUNDOS CUANDO PASEMOS A PRODUCCION 
+    @Scheduled(fixedDelay = 60000) // cada 10 segundos fijo CAMBIAR A 60 SEGUNDOS CUANDO PASEMOS A PRODUCCION 
     public void ejecutarOperacionesDiaADia() {
         try {
             System.out.println("======================================OPERACIONES===================================================");

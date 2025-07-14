@@ -237,7 +237,10 @@ public class SimulacionService {
                 // Publicar evento de fin de simulación
                 if(!simulacionColapso) {
                     eventPublisher.publicarEventoSimulacion(simulationId, 
-                        EventDTO.of(EventType.SIMULATION_COMPLETED, null));
+                        EventDTO.of(EventType.SIMULATION_COMPLETED, new ReporteDTO(
+                            context.getTotalPedidosEntregados(), 
+                            context.getTotalDistanciaRecorrida(), 
+                            context.getPedidoColapso())));
                 }
                 
                 System.out.println("Simulación " + simulationId + " completada hasta " + context.getCurrentTime());
