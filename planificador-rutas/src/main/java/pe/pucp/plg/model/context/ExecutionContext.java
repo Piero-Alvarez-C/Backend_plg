@@ -78,7 +78,21 @@ public class ExecutionContext {
 
     private boolean ignorarColapso = false;
 
+    // PARA REPORTE FINAL
+    private int totalPedidosEntregados = 0;
+    private double totalDistanciaRecorrida = 0.0;
+    private String pedidoColapso = null;
+
     // ————— GETTERS y SETTERS (tal como los tienes) —————
+
+    public int getTotalPedidosEntregados() { return totalPedidosEntregados; }
+    public void setTotalPedidosEntregados(int totalPedidosEntregados) { this.totalPedidosEntregados = totalPedidosEntregados; }
+
+    public double getTotalDistanciaRecorrida() { return totalDistanciaRecorrida; }
+    public void setTotalDistanciaRecorrida(double totalDistanciaRecorrida) { this.totalDistanciaRecorrida = totalDistanciaRecorrida; }
+
+    public String getPedidoColapso() { return pedidoColapso; }
+    public void setPedidoColapso(String pedidoColapso) { this.pedidoColapso = pedidoColapso; }
 
     public NavigableMap<LocalDateTime, List<Bloqueo>> getBloqueosPorTiempo() { return bloqueosPorTiempo; }
     public void setBloqueosPorTiempo(NavigableMap<LocalDateTime, List<Bloqueo>> bloqueosPorTiempo) { this.bloqueosPorTiempo = bloqueosPorTiempo; }

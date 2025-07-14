@@ -161,6 +161,7 @@ public class OrchestratorService {
             if (c.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
                 if (c.tienePasosPendientes()) {
                     c.avanzarUnPaso();
+                    contexto.setTotalDistanciaRecorrida(contexto.getTotalDistanciaRecorrida() + 1);
                 }
             }
 
@@ -168,6 +169,7 @@ public class OrchestratorService {
             if (c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                 if (c.tienePasosPendientes()) {
                     c.avanzarUnPaso();
+                    contexto.setTotalDistanciaRecorrida(contexto.getTotalDistanciaRecorrida() + 1);
                     /*System.out.printf("t+%d: → Camión %s avanza (retorno) a (%d,%d)%n",tiempoActual,
                             c.getPlantilla().getId(), c.getX(), c.getY());*/
                 } else {
@@ -268,6 +270,7 @@ public class OrchestratorService {
                 /*System.out.printf("💥 Colapso en t+%d, pedido %d incumplido%n",
                         tiempoActual, p.getId());*/
                 // Marca y elimina para no repetir el colapso
+                contexto.setPedidoColapso(p.getId() + " (" + p.getX() + "," + p.getY() + ")");
                 p.setDescartado(true);
                 itP.remove();
                 haColapsado = true;
@@ -277,7 +280,7 @@ public class OrchestratorService {
         if(haColapsado && !contexto.isIgnorarColapso()) {
             // Si ha colapsado y no se ignora, destruir la simulacion
             System.out.printf("💥 Colapso detectado en %s, finalizando simulación%n", tiempoActual);
-            eventPublisher.publicarEventoSimulacion(simulationId, EventDTO.of(EventType.SIMULATION_COLLAPSED, null));
+            eventPublisher.publicarEventoSimulacion(simulationId, EventDTO.of(EventType.SIMULATION_COLLAPSED, new ReporteDTO(contexto.getTotalPedidosEntregados(), contexto.getTotalDistanciaRecorrida(), contexto.getPedidoColapso())));
             return null;
         }
 
@@ -537,6 +540,7 @@ public class OrchestratorService {
                 double antes = camion.getCapacidadDisponible();
                 camion.setCapacidadDisponible(antes - pedido.getVolumen());
                 pedido.setAtendido(true); 
+                contexto.setTotalPedidosEntregados(contexto.getTotalPedidosEntregados() + 1);
                 // Eliminar pedido de la lista de pedidos
                 contexto.getPedidos().remove(pedido);
                 camion.clearDesvio();
