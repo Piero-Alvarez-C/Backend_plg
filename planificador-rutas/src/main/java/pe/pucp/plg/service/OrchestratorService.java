@@ -11,7 +11,6 @@ import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.common.Ruta;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.state.CamionEstado;
-import pe.pucp.plg.model.state.CamionEstado.TruckStatus;
 import pe.pucp.plg.model.state.TanqueDinamico;
 import pe.pucp.plg.service.algorithm.ACOPlanner;
 import pe.pucp.plg.util.ResourceLoader;
@@ -159,7 +158,7 @@ public class OrchestratorService {
             }
 
             // 2) Mover camiones que están en ruta (entregando o retornando)
-            if (c.getStatus() == CamionEstado.TruckStatus.DELIVERING || c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
+            if (c.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
                 if (c.tienePasosPendientes()) {
                     c.avanzarUnPaso();
                 }
@@ -284,7 +283,7 @@ public class OrchestratorService {
 
         // 7) Averías por turno (T1, T2, T3)
         //replanificar |= procesarAverias(contexto, tiempoActual);
-         boolean aux=procesarAverias(contexto, tiempoActual);
+        replanificar |= procesarAverias(contexto, tiempoActual);
         // 8) Construir estado “ligero” de la flota disponible para ACO
         List<CamionEstado> flotaEstado = contexto.getCamiones().stream()
                 .filter(c -> c.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE
@@ -472,7 +471,7 @@ public class OrchestratorService {
             }
         }
         countReplan++;
-        generarPuntosAverias(contexto);
+        //generarPuntosAverias(contexto);
         //System.out.println("[DEBUG] Puntos de avería generados: " + contexto.getPuntosAveria());
         EventDTO estadoActual = EventDTO.of(EventType.SNAPSHOT, MapperUtil.toSnapshotDTO(contexto));
         eventPublisher.publicarEventoSimulacion(simulationId, estadoActual);
@@ -508,6 +507,12 @@ public class OrchestratorService {
             // CASO A: El evento es un retorno a la planta (no hay pedido)
             if (pedido == null) {
                 startReturn(camion, tiempoActual, nuevosEventos, contexto);
+                continue;
+            }
+
+            if(camion == null) {
+                System.out.printf("❗ ERROR: Camión %s no encontrado para evento de entrega en %s%n",
+                        ev.getCamionId(), tiempoActual);
                 continue;
             }
 
@@ -856,6 +861,7 @@ public class OrchestratorService {
                         p.setHoraEntregaProgramada(finServicio);
                         // ────────────────────────────────────────────────────────────────────────────
                         p.setProgramado(true);
+                        calcularPuntosAveria(camion, contexto);
                         /*System.out.printf("🔀 t+%d: Pedido #%d asignado a Camión %s (desvío), cap restante=%.1f m³%n",
                                 tiempoActual, p.getId(), camion.getPlantilla().getId(), camion.getCapacidadDisponible());*/
                     }
@@ -886,6 +892,8 @@ public class OrchestratorService {
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
                     //camion.getHistory().addAll(rutaCompleta);
+
+                    calcularPuntosAveria(camion, contexto);
 
                     // 3) Programar un EntregaEvent secuencial para cada pedido
                     LocalDateTime t = tiempoActual;
@@ -1251,19 +1259,7 @@ public class OrchestratorService {
 
         return inactividad;
     }
-    /**
-    * Genera puntos de avería para todos los camiones con rutas asignadas
-    */
-    private void generarPuntosAverias(ExecutionContext contexto) {
-    
-    // Recorrer todos los camiones
-        for (CamionEstado camion : contexto.getCamiones()) {
-            // Solo calcular puntos de avería para camiones con ruta asignada
-            if (camion.tieneRutaAsignada() && camion.getRutaActual().size() > 0) {
-                calcularPuntosAveria(camion, contexto);
-            }
-        }
-    }
+
     private void calcularPuntosAveria(CamionEstado camion, ExecutionContext contexto) {
         String idCamion = camion.getPlantilla().getId();
         int totalPasos = camion.getRutaActual().size();
