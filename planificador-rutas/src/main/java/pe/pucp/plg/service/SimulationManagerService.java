@@ -88,6 +88,8 @@ public class SimulationManagerService {
             this.operationalContext.getBloqueosPorDia().add(b);
         }
 
+        this.operationalContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
+
         // 5. Set initial simulation time for operational context
         this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
         this.operationalContext.setCurrentTime(startTime.minusMinutes(1));                     // fecha y hora

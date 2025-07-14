@@ -336,7 +336,7 @@ public class OrchestratorService {
                 int mejorDist = Integer.MAX_VALUE;
                 // Encuentra el mejor camión para desvío
                 for (CamionEstado c : contexto.getCamiones()) {
-                    if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE) continue;
+                    if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE || c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) continue;
                     if (c.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
                     if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
@@ -1127,8 +1127,6 @@ public class OrchestratorService {
                 if (c != null && c.getStatus() == CamionEstado.TruckStatus.DELIVERING && 
                     c.getRutaActual() != null && !c.getRutaActual().isEmpty()) {         
                     Integer puntoAveria = contexto.getPuntosAveria().get(entry.getKey());
-                    System.out.println("punto averia: " + puntoAveria);
-                    System.out.println("paso actual: " + c.getPasoActual());
                     // Solo aplicar si hay un punto de avería calculado y el camión está en ese punto
                     if (puntoAveria != null && c.getPasoActual() == puntoAveria) {
                         System.out.println("<<<<<<<<<<< entro a procesar averias >>>>>>>>>>"); 
@@ -1310,6 +1308,8 @@ public class OrchestratorService {
         // Liberar pedidos pendientes y limpiar ruta
         for (Pedido pPend : new ArrayList<>(camion.getPedidosCargados())) {
             pPend.setProgramado(false); // volver a la cola de planificación
+            pPend.setHoraEntregaProgramada(null);
+            pPend.setAtendido(false); 
             System.out.println("🔴 Pedido " + pPend.getId() + " liberado por avería del camión " + camion.getPlantilla().getId());
         }
         // Limpieza total de datos de rutas y pedidos para el camión averiado

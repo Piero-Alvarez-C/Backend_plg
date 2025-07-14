@@ -15,8 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors; 
 
-import pe.pucp.plg.model.state.CamionEstado;
-
 import pe.pucp.plg.util.MapperUtil;
 
 @Service
@@ -105,38 +103,21 @@ public class OperationService {
      * @param turno El turno en que ocurrió la avería ("T1", "T2", "T3")
      */
     public Averia registrarAveriaCamion(AveriaDTO dto) {
-        ExecutionContext operationalContext = simulationManagerService.getOperationalContext();
-        if (operationalContext == null) {
-            throw new IllegalStateException("Operational context is not available.");
+        try {
+            ExecutionContext contextoActual = simulationManagerService.getOperationalContext();
+            String turno = dto.getTurno();
+            String camionId = dto.getCodigoVehiculo();
+            String tipoAveria = dto.getTipoIncidente();
+            Averia nuevaAveria = new Averia(turno, camionId, tipoAveria);
+            contextoActual.getAveriasPorTurno()
+                    .computeIfAbsent(turno, k -> new java.util.HashMap<>())
+                    .put(camionId, nuevaAveria);
+            System.out.println("Camión " + camionId + " marcado con avería: " + tipoAveria + " para el turno " + turno);
+            return nuevaAveria;
+        } catch (Exception e) {
+            System.err.println("Error registrando avería: " + e.getMessage());
+            throw new RuntimeException("Error al registrar avería en operación día a día", e);
         }
-        String turno= dto.getTurno();
-        String camionId= dto.getCodigoVehiculo();
-        String tipoAveria= dto.getTipoIncidente();
-        Averia nuevAveria= new Averia(turno,camionId,tipoAveria);
-        operationalContext.getAveriasPorTurno()
-                .computeIfAbsent(turno, k -> new java.util.HashMap<>()).put(camionId, nuevAveria);
-
-    
-        // Mark the truck as unavailable if the breakdown is for the current/active turn
-        // This logic might be more complex depending on how turns are managed vs.
-        // currentTime
-        // For simplicity, if an averia is registered, we might immediately mark the
-        // truck as inhabilitado.
-        operationalContext.getCamionesInhabilitados().add(camionId);
-
-        // Find the CamionEstado and update its status if necessary
-        operationalContext.getCamiones().stream()
-                .filter(c -> c.getPlantilla().getId().equals(camionId))
-                .findFirst()
-                .ifPresent(camion -> {
-                    System.out.println("Estado antes: " + camion.getStatus());
-                    camion.setStatus(CamionEstado.TruckStatus.BREAKDOWN);
-                    System.out.println("Estado después: " + camion.getStatus());
-                    System.out.println(
-                            "Camion " + camionId + " marked with averia: " + tipoAveria + " for turno " + turno);
-                });
-        // Potentially trigger re-planning
-        return nuevAveria;
     }
 
     public List<CamionDTO> getListaCamionesOperacionalesDTO() {

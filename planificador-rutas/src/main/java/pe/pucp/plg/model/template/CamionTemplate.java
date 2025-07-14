@@ -33,7 +33,7 @@ public class CamionTemplate {
 
     // Overloaded constructor with default initial position (0,0) and example consumption/speed
     public CamionTemplate(String id, double capacidadCarga, double tara, double capacidadCombustible) {
-        this(id, capacidadCarga, tara, capacidadCombustible, 0, 0, 0.2, 0.833); // Default 0.2 L/km, 50 km/h (0.833 km/min)
+        this(id, capacidadCarga, tara, capacidadCombustible, 12, 8, 0.2, 0.833); // Default 0.2 L/km, 50 km/h (0.833 km/min)
     }
     
     // Overloaded constructor with specified initial position and example consumption/speed
