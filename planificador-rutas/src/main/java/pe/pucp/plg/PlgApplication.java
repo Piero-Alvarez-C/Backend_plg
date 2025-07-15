@@ -12,4 +12,4 @@ public class PlgApplication {
     public static void main(String[] args) {
         SpringApplication.run(PlgApplication.class, args);
     }
-}
+}   

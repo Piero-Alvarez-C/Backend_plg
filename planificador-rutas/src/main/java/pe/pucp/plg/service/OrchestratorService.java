@@ -124,6 +124,54 @@ public class OrchestratorService {
                     replanificar = true;
                 }
             }
+
+            // Primero cleareamos los mantenimientos
+            for(CamionEstado c : contexto.getCamiones()) {
+                if(c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) {
+                    c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
+                }
+            }
+        }
+
+        if((tiempoActual.getHour() == 0 && tiempoActual.getMinute() == 0) || tiempoActual.minusMinutes(1).equals(contexto.getFechaInicio().atStartOfDay())) {
+            // Lógica de mantenimientos
+            LocalDate fechaActual = tiempoActual.toLocalDate();
+            String camionIdMantenimiento = contexto.getMantenimientos().get(fechaActual);
+            if(camionIdMantenimiento != null) {
+                CamionEstado camionParaMantenimiento = findCamion(camionIdMantenimiento, contexto);
+                if (camionParaMantenimiento != null) {
+                    TanqueDinamico planta = contexto.getTanques().get(0);
+                    if(camionParaMantenimiento.getStatus() == CamionEstado.TruckStatus.AVAILABLE) { // Esto quiere decir que está en un tanque o planta
+                        TanqueDinamico tanque = camionParaMantenimiento.getTanqueDestinoRecarga();
+                        if(tanque != null) {
+                            if(!tanque.equals(contexto.getTanques().get(0))) { // Si es el primer tanque, es que está en el depósito
+                                List<Point> camino = buildManhattanPath(camionParaMantenimiento.getX(), camionParaMantenimiento.getY(), planta.getPosX(), planta.getPosY(), tiempoActual, contexto);
+                                camionParaMantenimiento.setRuta(camino);
+                                camionParaMantenimiento.setPasoActual(0);
+                            }
+                            camionParaMantenimiento.setTiempoLibre(tiempoActual.plusHours(24));
+                        }
+                    } else if(!(camionParaMantenimiento.getStatus() == CamionEstado.TruckStatus.BREAKDOWN)) {
+                        List<Point> camino = buildManhattanPath(camionParaMantenimiento.getX(), camionParaMantenimiento.getY(), planta.getPosX(), planta.getPosY(), tiempoActual, contexto);
+                        camionParaMantenimiento.setRuta(camino);
+                        camionParaMantenimiento.setPasoActual(0);
+                        camionParaMantenimiento.setTiempoLibre(tiempoActual.plusHours(24));
+                    }
+                    for (Pedido pPend : new ArrayList<>(camionParaMantenimiento.getPedidosCargados())) {
+                        pPend.setProgramado(false); // volver a la cola de planificación
+                        pPend.setHoraEntregaProgramada(null);
+                        pPend.setAtendido(false); 
+                        System.out.println("🔴 Pedido " + pPend.getId() + " liberado por avería del camión " + camionParaMantenimiento.getPlantilla().getId());
+                    }
+                    // Limpieza total de datos de rutas y pedidos para el camión averiado
+                    camionParaMantenimiento.getPedidosCargados().clear();  // Limpiar pedidos cargados
+                    camionParaMantenimiento.setRuta(Collections.emptyList());  // Limpiar ruta actual
+                    camionParaMantenimiento.setPasoActual(0);  // Resetear paso actual
+                    camionParaMantenimiento.getHistory().clear();  // Limpiar historial de movimientos
+                    camionParaMantenimiento.setStatus(CamionEstado.TruckStatus.MAINTENANCE);
+                }
+            }
+
         }
 
         actualizarBloqueosActivos(contexto, tiempoActual);
@@ -145,7 +193,7 @@ public class OrchestratorService {
         // 3) Avanzar o procesar retorno y entregas por separado
         for (CamionEstado c : contexto.getCamiones()) {
             // 0) Está averiado => no procesar en absoluto
-            if (c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) {
+            if (c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) {
                 // Camión averiado, no se procesa en ningún caso
                 continue;
             }
@@ -291,6 +339,7 @@ public class OrchestratorService {
         List<CamionEstado> flotaEstado = contexto.getCamiones().stream()
                 .filter(c -> c.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE
                         && c.getStatus() != CamionEstado.TruckStatus.BREAKDOWN
+                        && c.getStatus() != CamionEstado.TruckStatus.MAINTENANCE
                         && c.getPedidosCargados().isEmpty()            // no tiene entregas encoladas
                         && c.getPedidoDesvio() == null)               // no está en medio de un desvío
                 .map(c -> {
@@ -339,7 +388,7 @@ public class OrchestratorService {
                 int mejorDist = Integer.MAX_VALUE;
                 // Encuentra el mejor camión para desvío
                 for (CamionEstado c : contexto.getCamiones()) {
-                    if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE || c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) continue;
+                    if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE || c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) continue;
                     if (c.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
                     if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
@@ -392,7 +441,7 @@ public class OrchestratorService {
                                 .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
                     }
                     // B) Si ya está DELIVERING → replan parcial
-                    else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+                    else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN || mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
 
                         // SI ESTABA RETURNING
                         if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
@@ -501,7 +550,7 @@ public class OrchestratorService {
             Pedido pedido = ev.getPedido();
         
             // Si el camión está averiado, ignorar cualquier evento programado
-            if (camion != null && camion.getStatus() == CamionEstado.TruckStatus.BREAKDOWN) {
+            if (camion != null && (camion.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || camion.getStatus() == CamionEstado.TruckStatus.MAINTENANCE)) {
                 System.out.println("🔴 Evento ignorado: Camión " + camion.getPlantilla().getId() + 
                               " está averiado y no puede procesar eventos.");
                 continue;
@@ -549,7 +598,7 @@ public class OrchestratorService {
                 camion.getPedidosCargados().removeIf(p -> p.getId() == pedido.getId());
 
                 // Después de entregar, decide si sigue con su ruta o vuelve a la base
-                if (!camion.getPedidosCargados().isEmpty() && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+                if (!camion.getPedidosCargados().isEmpty() && (camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && camion.getStatus() != CamionEstado.TruckStatus.MAINTENANCE)) {
                     Pedido siguiente = camion.getPedidosCargados().get(0);
                     List<Point> ruta = buildManhattanPath(
                             camion.getX(), camion.getY(),
@@ -568,7 +617,7 @@ public class OrchestratorService {
                 }
             } else {
                 // continuar con la ruta pendiente
-                if (!camion.getPedidosCargados().isEmpty() && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+                if (!camion.getPedidosCargados().isEmpty() && (camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && camion.getStatus() != CamionEstado.TruckStatus.MAINTENANCE)) {
                     Pedido siguiente = camion.getPedidosCargados().get(0);
                     List<Point> ruta = buildManhattanPath(
                             camion.getX(), camion.getY(),
@@ -845,7 +894,7 @@ public class OrchestratorService {
                             tiempoActual,
                             contexto
                     );
-                    if (caminoDesvio != null && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+                    if (caminoDesvio != null && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && camion.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
                         // 1) Reemplaza la ruta actual por el tramo de desvío
                         camion.getRutaActual().clear();
                         camion.getRutaActual().addAll(caminoDesvio);
@@ -883,7 +932,7 @@ public class OrchestratorService {
                 }
 
                 // 2) Si encolé algo, construyo la nueva ruta completa
-                if (!camion.getPedidosCargados().isEmpty() && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN) {
+                if (!camion.getPedidosCargados().isEmpty() && (camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && camion.getStatus() != CamionEstado.TruckStatus.MAINTENANCE)) {
                     List<Point> rutaCompleta = new ArrayList<>();
                     int cx = camion.getX(), cy = camion.getY();
                     for (Pedido p : camion.getPedidosCargados()) {

@@ -118,7 +118,7 @@ public class SimulacionService {
 
             // 7b. Cargar averías y asignarlas al contexto
             currentSimContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
-
+            currentSimContext.setMantenimientos(ResourceLoader.cargarMantenimientos());
 
             // 8. Inicializar las estructuras de datos necesarias
             currentSimContext.getEventosEntrega().clear();

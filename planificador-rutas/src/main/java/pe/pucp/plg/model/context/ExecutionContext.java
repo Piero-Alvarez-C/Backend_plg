@@ -83,7 +83,13 @@ public class ExecutionContext {
     private double totalDistanciaRecorrida = 0.0;
     private String pedidoColapso = null;
 
+    // Mantenimientos
+    private Map<LocalDate, String> mantenimientos = new HashMap<>();
+
     // ————— GETTERS y SETTERS (tal como los tienes) —————
+
+    public Map<LocalDate, String> getMantenimientos() { return mantenimientos; }
+    public void setMantenimientos(Map<LocalDate, String> mantenimientos) { this.mantenimientos = mantenimientos; }
 
     public int getTotalPedidosEntregados() { return totalPedidosEntregados; }
     public void setTotalPedidosEntregados(int totalPedidosEntregados) { this.totalPedidosEntregados = totalPedidosEntregados; }
