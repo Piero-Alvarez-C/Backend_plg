@@ -89,6 +89,7 @@ public class SimulationManagerService {
         }
 
         this.operationalContext.setAveriasPorTurno(ResourceLoader.cargarAverias());
+        this.operationalContext.setMantenimientos(ResourceLoader.cargarMantenimientos());
 
         // 5. Set initial simulation time for operational context
         this.operationalContext.setFechaInicio(startTime.toLocalDate());       // solo fecha
@@ -147,6 +148,7 @@ public class SimulationManagerService {
 
         // Para gestionar el colapso necesitamos una flag
         this.activeSimulationContext.setIgnorarColapso(!esColapso);
+        this.activeSimulationContext.setMantenimientos(ResourceLoader.cargarMantenimientos());
 
         return this.activeSimulationId;
     }

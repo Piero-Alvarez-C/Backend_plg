@@ -16,7 +16,8 @@ public class CamionEstado {
         DELIVERING,     // En ruta para descargar o recargar
         RETURNING,      // Regresando al depósito o a un tanque
         UNAVAILABLE,      // Procesando un pedido
-        BREAKDOWN       
+        BREAKDOWN,
+        MAINTENANCE       
     }
 
     // === Referencia a la plantilla ===

@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 
@@ -143,4 +144,17 @@ public class ResourceLoader {
             return Collections.emptyMap();
         }
     }
+
+    public static Map<LocalDate, String> cargarMantenimientos() {
+        Map<LocalDate, String> mantenimientos = new HashMap<>();
+        try {
+            String contenido = leerContenidoArchivo("mantenimientos.txt");
+            mantenimientos = ParseadorArchivos.parsearMantenimientos(contenido);
+            return mantenimientos;
+        } catch (IOException e) {
+            System.err.println("Error cargando mantenimientos: " + e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
 }

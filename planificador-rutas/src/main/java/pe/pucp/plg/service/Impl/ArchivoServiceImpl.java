@@ -4,7 +4,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import pe.pucp.plg.dto.enums.ArchivoTipo;
 import pe.pucp.plg.model.common.Bloqueo;
-import pe.pucp.plg.model.common.Mantenimiento;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.service.ArchivoService;
 import pe.pucp.plg.service.PlanificadorService;
@@ -39,10 +38,6 @@ public class ArchivoServiceImpl implements ArchivoService {
                 case PEDIDOS -> {
                     List<Pedido> pedidos = ParseadorArchivos.parsearPedidos(contenido, fechaPrimerDiaDelMes);
                     planificadorService.setPedidos(pedidos);
-                }
-                case MANTENIMIENTOS -> {
-                    List<Mantenimiento> mantenimientos = ParseadorArchivos.parsearMantenimientos(contenido);
-                    planificadorService.setMantenimientos(mantenimientos);
                 }
                 case BLOQUEOS -> {
                     List<Bloqueo> bloqueos = ParseadorArchivos.parsearBloqueos(contenido, fechaPrimerDiaDelMes);

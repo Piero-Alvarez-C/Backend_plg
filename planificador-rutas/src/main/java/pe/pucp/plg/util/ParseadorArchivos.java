@@ -1,13 +1,13 @@
 package pe.pucp.plg.util;
 
 import pe.pucp.plg.model.common.Bloqueo;
-import pe.pucp.plg.model.common.Mantenimiento;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.service.Impl.BloqueoServiceImpl;
 import pe.pucp.plg.model.common.Averia;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,8 +49,23 @@ public class ParseadorArchivos {
     }
 
     // 🟡 Solo placeholder si vas a usar mantenimientos luego
-    public static List<Mantenimiento> parsearMantenimientos(String contenido) {
-        return new ArrayList<>();
+    public static Map<LocalDate, String> parsearMantenimientos(String contenido) {
+        Map<LocalDate, String> mantenimientos = new HashMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        for (String linea : contenido.split("\\R")) {
+            if (linea.isBlank()) continue;
+            try {
+                String[] partes = linea.split(":");
+                LocalDate fecha = LocalDate.parse(partes[0], formatter);
+                String camionId = partes[1];
+                mantenimientos.put(fecha, camionId);
+            } catch (Exception e) {
+                System.err.println("⚠️ Error parseando línea de mantenimiento: " + linea);
+                e.printStackTrace();
+            }
+        }
+        System.out.printf("✅ Cargados %d mantenimientos programados.%n", mantenimientos.size());
+        return mantenimientos;  
     }
 
     public static List<Bloqueo> parsearBloqueos(String contenido, LocalDate fechaPrimerDiaDelMes) {
