@@ -395,11 +395,10 @@ public class OrchestratorService {
                         //if(p.getTiempoLimite() == null || c.getPedidosCargados().size() == 0) {
                             mejor = c;
                             mejorDist = dist;
-                        //} //else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
-                            //mejor = c;
-                            //mejorDist = dist;   
+                        //} else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
+                        //    mejor = c;
+                        //    mejorDist = dist;   
                         //}
-                        
                     }
                 }
                 if (mejor != null) {
@@ -433,8 +432,16 @@ public class OrchestratorService {
 
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionEstado cam = mejor;
+                        if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
+                            // Esta línea sigue siendo riesgosa, pero es menos destructiva.
+                            // Idealmente, se deberían remover eventos por ID de pedido, no por ID de camión.
+                            contexto.getEventosEntrega()
+                                    .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
+                        }
+
+                        // Se crea el nuevo evento para el desvío
                         contexto.getEventosEntrega()
-                                .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
+                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
 
                         // programar SOLO el evento de llegada
                         contexto.getEventosEntrega()
@@ -669,6 +676,13 @@ public class OrchestratorService {
         c.setStatus(CamionEstado.TruckStatus.RETURNING);
 
         List<Point> camino = buildManhattanPath(sx, sy, destX, destY, tiempoActual, contexto);
+
+        if (camino == null || camino.isEmpty()) {
+            System.err.printf(
+                    "⚠️ t+%s: Camión %s no puede retornar a (%d,%d). No se encontró ruta. Permanece AVAILABLE en (%d,%d).%n",
+                    tiempoActual, c.getPlantilla().getId(), destX, destY, c.getX(), c.getY());
+            return;
+        }
         c.setRuta(camino);
         c.setPasoActual(0);
         //c.getHistory().addAll(camino);
@@ -949,14 +963,23 @@ public class OrchestratorService {
                     calcularPuntosAveria(camion, contexto);
 
                     // 3) Programar un EntregaEvent secuencial para cada pedido
-                    LocalDateTime t = tiempoActual;
+                    LocalDateTime horaProximaAccion = tiempoActual;
                     cx = camion.getX();
                     cy = camion.getY();
                     for (Pedido p : camion.getPedidosCargados()) {
-                        int pasos = buildManhattanPath(cx, cy, p.getX(), p.getY(), t, contexto).size();
-                        t = t.plusMinutes(pasos + TIEMPO_SERVICIO);
-                        contexto.getEventosEntrega().add(new EntregaEvent(t, camion.getPlantilla().getId(), p));
-                        p.setHoraEntregaProgramada(t);
+                        int pasos = buildManhattanPath(cx, cy, p.getX(), p.getY(), horaProximaAccion, contexto).size();
+                        
+                        // Calculate the arrival time for this specific stop
+                        LocalDateTime horaLlegada = horaProximaAccion.plusMinutes(pasos);
+                        
+                        // Schedule the ARRIVAL event
+                        contexto.getEventosEntrega().add(new EntregaEvent(horaLlegada, camion.getPlantilla().getId(), p));
+                        p.setHoraEntregaProgramada(horaLlegada);
+
+                        // The next leg of the journey can only start after this service is complete
+                        horaProximaAccion = horaLlegada.plusMinutes(TIEMPO_SERVICIO);
+                        
+                        // Update the starting point for the next iteration
                         cx = p.getX();
                         cy = p.getY();
                     }

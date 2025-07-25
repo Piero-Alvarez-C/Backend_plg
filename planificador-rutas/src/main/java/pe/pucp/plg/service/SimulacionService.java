@@ -132,7 +132,7 @@ public class SimulacionService {
             status.setNombreSimulacion(nombre);
             status.setEstado("INITIALIZED"); 
             status.setAvance(0);
-    
+
             return status;
     
         } catch (Exception e) {
