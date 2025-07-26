@@ -79,10 +79,11 @@ public class SimulationStateService {
         }
 
         // 5.a) Calcular capacidad máxima de un camión (suponiendo que todos tienen la misma capacidad)
-        double capacidadMaxCamion = contexto.getCamiones().stream()
+        /*double capacidadMaxCamion = contexto.getCamiones().stream()
                 .mapToDouble(c -> c.getPlantilla().getCapacidadCarga())
                 .max()
-                .orElse(0);
+                .orElse(0);*/
+        double capacidadMaxCamion = 10.0;
 
         List<Pedido> pedidosAInyectar = new ArrayList<>();
         for (Pedido p : nuevos) {
