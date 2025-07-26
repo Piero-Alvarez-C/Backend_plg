@@ -98,7 +98,7 @@ public class OrchestratorService {
 
         stateService.inyectarPedidos(contexto, tiempoActual, replanificar);
 
-        if (countReplan == INTERVALO_REPLAN && !replanificar) {
+        if ((countReplan % INTERVALO_REPLAN == 0 || countReplan == INTERVALO_REPLAN) && !replanificar) { 
             System.out.println("Replanificando");   
             replanificar = true;
             countReplan = 0;

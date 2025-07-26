@@ -253,6 +253,7 @@ public class SimulacionService {
                 System.out.println("Simulación " + simulationId + " completada hasta " + context.getCurrentTime());
             } catch (Exception e) {
                 System.err.println("Error al ejecutar simulación completa: " + e.getMessage());
+                e.printStackTrace();
                 eventPublisher.publicarEventoSimulacion(simulationId, 
                     EventDTO.of(EventType.SIMULATION_ERROR, e.getMessage()));
             } finally {

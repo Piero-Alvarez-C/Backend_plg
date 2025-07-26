@@ -72,13 +72,6 @@ public class SimulationManagerService {
         for (Map.Entry<LocalDateTime, List<Pedido>> entry : pedidosPorTiempo.entrySet()) {
             LocalDateTime fechaHora = entry.getKey();
             List<Pedido> pedidos = entry.getValue();
-
-            System.out.println("Fecha y hora: " + fechaHora);
-            System.out.println("Pedidos:");
-
-            for (Pedido p : pedidos) {
-                System.out.println("\tPedido en ubicación (" + p.getX() + ", " + p.getY() + "), volumen: " + p.getVolumen());
-            }
         }
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
 

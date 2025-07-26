@@ -13,6 +13,8 @@ public class PedidoDTO {
     private double volumen;
     private boolean atendido;
     private boolean descartado;
+    private boolean programado;
+    private boolean enEntrega;
 
     // Getters y Setters
     public int getId() { return id; }
@@ -41,5 +43,11 @@ public class PedidoDTO {
 
     public boolean isDescartado() { return descartado; }
     public void setDescartado(boolean descartado) { this.descartado = descartado; }
+
+    public boolean isProgramado() { return programado; }
+    public void setProgramado(boolean programado) { this.programado = programado; }
+
+    public boolean isEnEntrega() { return enEntrega; }
+    public void setEnEntrega(boolean enEntrega) { this.enEntrega = enEntrega; }
 
 }

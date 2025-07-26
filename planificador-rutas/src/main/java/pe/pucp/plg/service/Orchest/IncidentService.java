@@ -121,51 +121,36 @@ public class IncidentService {
     }
 
     
-    public static int calcularTiempoAveria(String turnoActual, String tipoIncidente  ,int tiempoActual) {
+    public int calcularTiempoAveria(String turnoActual, String tipoIncidente, LocalDateTime tiempoActual) {
         int inactividad = 0;
-        int minutosEnTurno = tiempoActual % 480; // Minutos dentro del turno actual
-        int minutosHastaFinTurno = 480 - minutosEnTurno; // Minutos hasta fin de turno
+        
+        // El cálculo para el turno actual sigue igual
+        int minutosEnTurno = (tiempoActual.getHour() * 60 + tiempoActual.getMinute()) % 480;
+        int minutosHastaFinTurno = 480 - minutosEnTurno;
 
         switch (tipoIncidente) {
             case "T1":
-                // Tipo 1: 2 horas en sitio (120 minutos)
                 inactividad = 120;
                 break;
 
             case "T2":
-                // Tipo 2: 2 horas en sitio + tiempo variable según turno
-                inactividad = 120; // Inmovilización inicial de 2 horas
-
+                inactividad = 120; // Inmovilización inicial
                 switch (turnoActual) {
-                    case "T1":
-                        // Disponible en turno 3 del mismo día (saltar turno 2 completo)
-                        inactividad += minutosHastaFinTurno; // Resto del turno 1
-                        inactividad += 480; // Turno 2 completo
-                        break;
-                    case "T2":
-                        // Disponible en turno 1 del día siguiente
-                        inactividad += minutosHastaFinTurno; // Resto del turno 2
-                        inactividad += 480; // Turno 3 completo
-                        break;
-                    case "T3":
-                        // Disponible en turno 2 del día siguiente
-                        inactividad += minutosHastaFinTurno; // Resto del turno 3
-                        inactividad += 480; // Turno 1 del día siguiente completo
-                        break;
+                    // Esta lógica se mantiene
+                    case "T1": inactividad += minutosHastaFinTurno + 480; break;
+                    case "T2": inactividad += minutosHastaFinTurno + 480; break;
+                    case "T3": inactividad += minutosHastaFinTurno + 480; break;
                 }
                 break;
 
             case "T3":
-                // Tipo 3: 4 horas en sitio + tiempo hasta T1 del día A+3
-                inactividad = 240; // Inmovilización inicial de 4 horas
+                inactividad = 240; // Inmovilización inicial
                 
-                // Calcula minutos desde hora actual hasta las 00:00 del día A+3
-                // Primero, minutos restantes del día actual
-                int minutosRestantesDiaActual = 1440 - (tiempoActual % 1440);
-                // Más un día completo (día A+1 a A+2)
-                int minutosHastaDiaA3 = minutosRestantesDiaActual + 1440;
-                // Más 0 minutos del día A+3 (ya estamos al inicio del día)
-                inactividad += minutosHastaDiaA3;
+                // --- CÁLCULO CORREGIDO Y SIMPLIFICADO ---
+                LocalDateTime diaA3 = tiempoActual.toLocalDate().plusDays(2).atStartOfDay(); // 00:00 del día A+2 (inicio del día 3)
+                long minutosHastaDiaA3 = java.time.Duration.between(tiempoActual, diaA3).toMinutes();
+                
+                inactividad += (int) minutosHastaDiaA3;
                 break;
 
             default:
@@ -209,9 +194,9 @@ public class IncidentService {
     
     private boolean aplicarAveria(CamionEstado camion, Averia averia, LocalDateTime tiempoActual, 
                             String turnoActual, ExecutionContext contexto, String key) {
-    // Determinar penalización según tipo de avería
-        int minutosActuales = tiempoActual.getHour() * 60 + tiempoActual.getMinute();
-        int penal = calcularTiempoAveria(turnoActual, averia.getTipoIncidente(), minutosActuales);           
+        // Determinar penalización según tipo de avería
+        //int minutosActuales = tiempoActual.getHour() * 60 + tiempoActual.getMinute();
+        int penal = calcularTiempoAveria(turnoActual, averia.getTipoIncidente(), tiempoActual);
         camion.setTiempoLibreAveria(tiempoActual.plusMinutes(penal));
         camion.setTiempoInicioAveria(tiempoActual); // Guardar cuándo inicia la avería
         camion.setStatus(CamionEstado.TruckStatus.BREAKDOWN);

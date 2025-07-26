@@ -46,6 +46,7 @@ public class PlanningService {
             if (flotaEstado.isEmpty()) {
                 return tiempoActual;
             }
+            System.out.println("Se está replanificando...");
 
             // A) cancelar y desprogramar — sólo si hay camiones
             Set<Integer> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
@@ -67,13 +68,8 @@ public class PlanningService {
                     if (c.getCapacidadDisponible() < p.getVolumen()) continue;
                     int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
                     if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
-                        if(p.getTiempoLimite() == null || c.getPedidosCargados().size() == 0) {
-                            mejor = c;
-                            mejorDist = dist;
-                        } else if (c.getPedidosCargados().get(0).getTiempoLimite().isAfter(p.getTiempoLimite())) {
-                            mejor = c;
-                            mejorDist = dist;   
-                        }
+                        mejor = c;
+                        mejorDist = dist;
                     }
                 }
                 if (mejor != null) {

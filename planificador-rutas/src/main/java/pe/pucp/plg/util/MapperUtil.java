@@ -42,8 +42,12 @@ public class MapperUtil {
         }
         
         // Agregar ID de pedido de desvío si existe
-        if (camion.getPedidoDesvio() != null && camion.getPedidoDesvio().getId() != camion.getPedidosCargados().get(0).getId()) {
-            pedidosIds.add(String.valueOf(camion.getPedidoDesvio().getId()));
+        if (camion.getPedidoDesvio() != null) {
+            if (camion.getPedidosCargados().isEmpty() || 
+                camion.getPedidoDesvio().getId() != camion.getPedidosCargados().get(0).getId()) {
+                
+                pedidosIds.add(String.valueOf(camion.getPedidoDesvio().getId()));
+            }
         }
         
         dto.setPedidos(pedidosIds);
@@ -72,6 +76,8 @@ public class MapperUtil {
         dto.setVolumen(pedido.getVolumen());
         dto.setAtendido(pedido.isAtendido());
         dto.setDescartado(pedido.isDescartado());
+        dto.setProgramado(pedido.isProgramado());
+        dto.setEnEntrega(pedido.isEnEntrega());
         return dto;
     }
 
