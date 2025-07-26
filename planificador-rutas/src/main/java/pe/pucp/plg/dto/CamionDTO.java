@@ -11,6 +11,7 @@ public class CamionDTO {
     private String status;
     private double consumoAcumulado;
     private List<PointDTO> ruta;
+    private List<String> pedidos; // Id de los pedidos a los que va
 
     // Getters y Setters
     public String getId() { return id; }
@@ -41,5 +42,10 @@ public class CamionDTO {
     public List<PointDTO> getRuta() { return ruta; }
     public void setRuta(List<PointDTO> ruta) {
         this.ruta = ruta;
+    }   
+
+    public List<String> getPedidos() { return pedidos; }
+    public void setPedidos(List<String> pedidos) {
+        this.pedidos = pedidos;
     }
 }

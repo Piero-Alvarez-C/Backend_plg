@@ -66,6 +66,8 @@ public class CamionEstado {
     private TanqueDinamico reabastecerEnTanque = null; 
     private LocalDateTime retHora;
     private int retStartX = 0, retStartY = 0, retDestX = 0, retDestY = 0;
+    private TanqueDinamico tanqueOrigen = null;
+    private TanqueDinamico tanqueOrigenBackup = null;
     
     // --- Para averías ---
     private String tipoAveriaActual = null; // T1, T2, T3 o null si no hay avería
@@ -135,6 +137,8 @@ public class CamionEstado {
     public List<Point> getRutaBackup() { return rutaBackup; }
     public List<Pedido> getPedidosBackup() { return pedidosBackup; }
     public Pedido getPedidoDesvio() { return pedidoDesvio; }
+    public TanqueDinamico getTanqueOrigen() { return tanqueOrigen; }
+    public TanqueDinamico getTanqueOrigenBackup() { return tanqueOrigenBackup; }
 
     // Setters for cloned instances used by ACOPlanner
     public void setCapacidadDisponible(double nuevaCapacidad) { this.capacidadDisponible = nuevaCapacidad; }
@@ -160,6 +164,8 @@ public class CamionEstado {
     public void setRutaBackup(List<Point> r) { this.rutaBackup = r; }
     public void setPedidosBackup(List<Pedido> p) { this.pedidosBackup = p; }
     public void setPedidoDesvio(Pedido d) { this.pedidoDesvio = d; }
+    public void setTanqueOrigen(TanqueDinamico t) { this.tanqueOrigen = t; }
+    public void setTanqueOrigenBackup(TanqueDinamico t) { this.tanqueOrigenBackup = t; }
 
     public void clearDesvio() {
         this.rutaBackup = null;

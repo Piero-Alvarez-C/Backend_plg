@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pe.pucp.plg.factory.FlotaFactory;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
@@ -51,6 +52,11 @@ public class SimulationManagerService {
 
         // 2. Initialize Tanques
         this.operationalContext.setTanques(tanqueService.inicializarTanques());
+
+        for(CamionEstado c : this.operationalContext.getCamiones()) {
+            c.setTanqueOrigen(this.operationalContext.getTanques().get(0)); // Asignar la planta
+            c.setTanqueOrigenBackup(this.operationalContext.getTanques().get(0)); // Asignar la planta como backup
+        }
 
         // 3. Initialize Pedidos from ResourceLoader
         LocalDateTime startTime = LocalDateTime.now();  // Fecha y hora actual precisa al momento de iniciar
@@ -125,6 +131,12 @@ public class SimulationManagerService {
 
         this.activeSimulationContext.setCamiones(flotaFactory.crearNuevaFlota()); 
         this.activeSimulationContext.setTanques(tanqueService.inicializarTanques());
+
+        for(CamionEstado c : this.activeSimulationContext.getCamiones()) {
+            c.setTanqueOrigen(this.activeSimulationContext.getTanques().get(0)); // Asignar la planta
+            c.setTanqueOrigenBackup(this.activeSimulationContext.getTanques().get(0)); // Asignar la planta como backup
+            System.out.println("Tanque origen backup para camion " + c.getPlantilla().getId() + ": " + c.getTanqueOrigenBackup().getId());
+        }
 
         // Initialize Pedidos from PedidoRepository for the new simulation context
         LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);

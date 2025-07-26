@@ -31,15 +31,33 @@ public class MapperUtil {
                     .collect(Collectors.toList());
             dto.setRuta(ruta);
         }
+        
+        List<String> pedidosIds = new ArrayList<>();
+        
+        // Agregar IDs de pedidos cargados
+        if (camion.getPedidosCargados() != null) {
+            for (Pedido pedido : camion.getPedidosCargados()) {
+                pedidosIds.add(String.valueOf(pedido.getId()));
+            }
+        }
+        
+        // Agregar ID de pedido de desvío si existe
+        if (camion.getPedidoDesvio() != null && camion.getPedidoDesvio().getId() != camion.getPedidosCargados().get(0).getId()) {
+            pedidosIds.add(String.valueOf(camion.getPedidoDesvio().getId()));
+        }
+        
+        dto.setPedidos(pedidosIds);
         return dto;
     }
 
     public static TanqueDTO toTanqueDTO(TanqueDinamico tanque) {
         TanqueDTO dto = new TanqueDTO();
+        dto.setId(tanque.getId());
         dto.setPosX(tanque.getPosX());
         dto.setPosY(tanque.getPosY());
         dto.setCapacidadTotal(tanque.getCapacidadTotal()); // Corrected: Direct getter from TanqueDinamico
         dto.setCapacidadDisponible(tanque.getDisponible()); // Corrected: Renamed from getCapacidadActual
+        dto.setPedidos(tanque.getPedidos()); // Added: Get pedidos from TanqueDinamico
         return dto;
     }
 

@@ -9,6 +9,7 @@ import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.util.ResourceLoader;
 
 import java.time.LocalDate;
@@ -109,6 +110,12 @@ public class SimulacionService {
                 currentSimContext.getPedidosPorTiempo().remove(tiempoInicial);
             }
             
+            for(CamionEstado c : currentSimContext.getCamiones()) {
+                c.setTanqueOrigen(currentSimContext.getTanques().get(0)); // Asignar la planta
+                c.setTanqueOrigenBackup(currentSimContext.getTanques().get(0)); // Asignar la planta como backup
+                System.out.println("Tanque origen backup para camion " + c.getPlantilla().getId() + ": " + c.getTanqueOrigenBackup().getId());
+            }
+
             // 7. Establecer los bloqueos iniciales
 
             for (Bloqueo b : bloqueosDiaUno) {
