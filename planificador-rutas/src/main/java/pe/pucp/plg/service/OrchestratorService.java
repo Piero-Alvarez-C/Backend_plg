@@ -41,18 +41,29 @@ public class OrchestratorService {
 
     private int countReplan = 0;
 
-    @Autowired
-    public OrchestratorService(EventPublisherService eventPublisher) {
-        this.acoPlanner = new ACOPlanner();
-        this.pathfindingService = new PathfindingService();
-        this.fleetService = new FleetService();
-        this.incidentService = new IncidentService(this.fleetService);
-        this.eventService = new DeliveryEventService(this.pathfindingService, this.fleetService);
-        this.planningService = new PlanningService(this.pathfindingService, this.fleetService, this.incidentService, this.acoPlanner);
-        this.maintenanceService = new MaintenanceService(this.pathfindingService, this.fleetService);
-        this.stateService = new SimulationStateService(this.maintenanceService);
-        this.blockageService = new BlockageService();
+    @Autowired // 👈 Anota el constructor
+    public OrchestratorService(
+        SimulationStateService stateService,
+        IncidentService incidentService,
+        MaintenanceService maintenanceService,
+        BlockageService blockageService,
+        FleetService fleetService,
+        DeliveryEventService eventService,
+        PlanningService planningService,
+        EventPublisherService eventPublisher,
+        PathfindingService pathfindingService,
+        ACOPlanner acoPlanner
+    ) {
+        this.stateService = stateService;
+        this.incidentService = incidentService;
+        this.maintenanceService = maintenanceService;
+        this.blockageService = blockageService;
+        this.fleetService = fleetService;
+        this.eventService = eventService;
+        this.planningService = planningService;
         this.eventPublisher = eventPublisher;
+        this.pathfindingService = pathfindingService;
+        this.acoPlanner = acoPlanner;
         this.countReplan = 0;
     }
 

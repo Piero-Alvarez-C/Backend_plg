@@ -105,8 +105,6 @@ public class PlanningService {
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionEstado cam = mejor;
                         if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
-                            // Esta línea sigue siendo riesgosa, pero es menos destructiva.
-                            // Idealmente, se deberían remover eventos por ID de pedido, no por ID de camión.
                             contexto.getEventosEntrega()
                                     .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
                         }

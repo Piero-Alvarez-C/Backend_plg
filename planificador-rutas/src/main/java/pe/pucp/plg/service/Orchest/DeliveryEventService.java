@@ -99,7 +99,8 @@ public class DeliveryEventService {
                             tiempoActual,
                             contexto
                     );
-                    int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    //int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    int tt = ruta.size(); 
                     camion.setRuta(ruta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
