@@ -112,8 +112,6 @@ public class SimulacionService {
             
             for(CamionEstado c : currentSimContext.getCamiones()) {
                 c.setTanqueOrigen(currentSimContext.getTanques().get(0)); // Asignar la planta
-                c.setTanqueOrigenBackup(currentSimContext.getTanques().get(0)); // Asignar la planta como backup
-                System.out.println("Tanque origen backup para camion " + c.getPlantilla().getId() + ": " + c.getTanqueOrigenBackup().getId());
             }
 
             // 7. Establecer los bloqueos iniciales

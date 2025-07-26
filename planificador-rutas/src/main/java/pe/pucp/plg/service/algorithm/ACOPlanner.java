@@ -15,10 +15,11 @@ import java.util.stream.Collectors;
 @Service
 public class ACOPlanner {
 
-    private static final int ITERACIONES = 50; // ajustar según tus pruebas
-    private static final int HORMIGAS = 30;    // idem
+    private static final int ITERACIONES = 60; // ajustar según tus pruebas
+    private static final int HORMIGAS = 40;    // idem
     private static final double ALPHA = 1.0;
-    private static final double BETA = 2.0;
+    private static final double BETA = 1.5;
+    private static final double BETA_URGENCIA = 5.0; 
     private static final double RHO = 0.1;     // evaporación
     private static final double Q = 100.0;     // feromona depositada
 
@@ -83,7 +84,7 @@ public class ACOPlanner {
                 idToIndex.put(flotaEstado.get(i).getPlantilla().getId(), i);
             }
             for (List<Ruta> sol : soluciones) {
-                double coste = calcularCosteTotal(sol);
+                double coste = calcularCosteTotal(sol, pedidosActivos, flotaEstado, tiempoActual); 
                 if (coste < mejorCoste) {
                     mejorCoste = coste;
                     mejorSol = sol;
@@ -176,14 +177,29 @@ public class ACOPlanner {
                 double galNecesarios = distKm * pesoTotalTon / 180.0;
                 if (c.getCombustibleActual() < galNecesarios) continue;
 
-                // heurística + feromona
+                // 1. Heurística de Distancia (la que ya tenías)
+                double heuristicaDistancia = 1.0 / (distKm + 1);
+
+                // 2. Heurística de Urgencia (NUEVA)
+                long laxitudEnMinutos = ChronoUnit.MINUTES.between(tiempoEstimadoLlegada, p.getTiempoLimite());
+                // Si la laxitud es negativa o cero, el pedido es extremadamente urgente.
+                // Le damos un valor mínimo de 1 para evitar división por cero.
+                if (laxitudEnMinutos < 1) {
+                    laxitudEnMinutos = 1;
+                }
+                double heuristicaUrgencia = 1.0 / laxitudEnMinutos;
+
+                // 3. Combinar las heurísticas
+                // La disponibilidad del camión sigue siendo importante.
                 long minutesDiff = 0;
                 if (c.getTiempoLibre() != null) {
                     minutesDiff = Math.max(0, ChronoUnit.MINUTES.between(tiempoActual, c.getTiempoLibre()));
                 }
-                double penalTiempo = 1.0 / (1 + minutesDiff);
-                double eta = 1.0 / (distKm + 1) * penalTiempo;
-                prob[v][idx] = Math.pow(tau[v][idx], ALPHA) * Math.pow(eta, BETA);
+                double penalTiempoCamion = 1.0 / (1 + minutesDiff);
+                
+                double eta = Math.pow(heuristicaDistancia * penalTiempoCamion, BETA) * Math.pow(heuristicaUrgencia, BETA_URGENCIA);
+                
+                prob[v][idx] = Math.pow(tau[v][idx], ALPHA) * eta;
             }
         }
         return prob;
@@ -274,12 +290,42 @@ public class ACOPlanner {
     // ------------------------------------------------------------
     // 7) Costo total de las rutas (suma de consumos)
     // ------------------------------------------------------------
-    private double calcularCosteTotal(List<Ruta> sol) {
-        // + 100 por pedido con ventana de entrega < 90 minutos
-        // Diferencia entre el glp disponible del camion y el glp del pedido * multiplicador
-        return sol.stream().mapToDouble(r -> r.consumo).sum();
-    }
+    private double calcularCosteTotal(List<Ruta> sol, List<Pedido> pedidosActivos, List<CamionEstado> flota, LocalDateTime tiempoActual) {
+        double costeConsumo = sol.stream().mapToDouble(r -> r.consumo).sum();
+        double costeTardanza = 0;
+        final double PENALTY_POR_MINUTO_TARDE = 1000.0; // ¡Un valor muy alto para que domine!
 
+        List<CamionEstado> flotaSimulada = deepCopyFlota(flota);
+
+        for (Ruta ruta : sol) {
+            CamionEstado camionSimulado = findCamionInList(ruta.getCamionId(), flotaSimulada);
+            if (camionSimulado == null) continue;
+            
+            LocalDateTime tiempoSimulado = tiempoActual;
+            double minPorKm = 60.0 / 50.0;
+
+            for (int pedidoIdx : ruta.getPedidoIds()) {
+                Pedido pedido = pedidosActivos.get(pedidoIdx);
+                
+                // Simular viaje
+                int dist = Math.abs(camionSimulado.getX() - pedido.getX()) + Math.abs(camionSimulado.getY() - pedido.getY());
+                int tiempoViaje = (int) Math.ceil(dist * minPorKm);
+                
+                tiempoSimulado = tiempoSimulado.plusMinutes(tiempoViaje);
+                
+                if (tiempoSimulado.isAfter(pedido.getTiempoLimite())) {
+                    long minutosTarde = ChronoUnit.MINUTES.between(pedido.getTiempoLimite(), tiempoSimulado);
+                    costeTardanza += minutosTarde * PENALTY_POR_MINUTO_TARDE;
+                }
+
+                // Actualizar para el siguiente tramo
+                camionSimulado.setX(pedido.getX());
+                camionSimulado.setY(pedido.getY());
+                tiempoSimulado = tiempoSimulado.plusMinutes(15); // Tiempo de servicio
+            }
+        }
+        return costeConsumo + costeTardanza;
+    }
     // ------------------------------------------------------------
     // 8) Buscar un camión en una flota por su id
     // ------------------------------------------------------------

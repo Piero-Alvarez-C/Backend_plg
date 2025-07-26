@@ -54,9 +54,13 @@ public class FleetService {
                     c.getPedidosCargados().clear();
                     for(TanqueDinamico t : contexto.getTanques()) {
                         if (t.getPosX() == c.getX() && t.getPosY() == c.getY()) {
-                            c.setTanqueOrigenBackup(t);
+                            if(t.equals(contexto.getTanques().get(0))) {
+                                c.setTiempoLibre(tiempoActual);
+                            }
+                            c.setTanqueOrigen(t);
                             break;
                         }
+
                     }
                 }
                 continue;
@@ -69,7 +73,6 @@ public class FleetService {
                 continue;
             }
 
-            // 4) AVAILABLE con ruta vacía → simplemente espera asignación
         }
     }
 

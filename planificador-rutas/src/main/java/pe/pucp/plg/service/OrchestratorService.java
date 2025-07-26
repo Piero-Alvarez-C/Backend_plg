@@ -36,12 +36,11 @@ public class OrchestratorService {
     private final ACOPlanner acoPlanner;
     private final EventPublisherService eventPublisher;
 
-    private static final int UMBRAL_VENCIMIENTO = 90;
-    private static final int INTERVALO_REPLAN = 60; 
+    private static final int INTERVALO_REPLAN = 50; 
 
     private int countReplan = 0;
 
-    @Autowired // 👈 Anota el constructor
+    @Autowired 
     public OrchestratorService(
         SimulationStateService stateService,
         IncidentService incidentService,
@@ -102,14 +101,6 @@ public class OrchestratorService {
             System.out.println("Replanificando");   
             replanificar = true;
             countReplan = 0;
-        }
-
-        // (B) pedidos próximos a vencer: umbral en minutos
-        boolean hayUrgentes = contexto.getPedidos().stream()
-                .filter(p -> !p.isAtendido() && !p.isDescartado())
-                .anyMatch(p -> p.getTiempoLimite().minusMinutes(UMBRAL_VENCIMIENTO).isBefore(tiempoActual));
-        if (hayUrgentes) {
-            replanificar = true;
         }
 
         if(stateService.hayColapso(contexto, tiempoActual) && !contexto.isIgnorarColapso()) {

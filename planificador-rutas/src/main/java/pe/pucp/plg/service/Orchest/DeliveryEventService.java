@@ -154,7 +154,6 @@ public class DeliveryEventService {
         int destY = mejorT != null ? mejorT.getPosY() : dy;
         if (mejorT != null) {
             mejorT.setDisponible(mejorT.getDisponible() - falta);
-            c.setTanqueOrigen(mejorT);
         }
         c.setStatus(CamionEstado.TruckStatus.RETURNING);
 

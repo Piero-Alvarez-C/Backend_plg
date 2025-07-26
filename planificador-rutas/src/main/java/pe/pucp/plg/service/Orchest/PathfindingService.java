@@ -125,6 +125,9 @@ public class PathfindingService {
      * @return Lista de puntos que forman la ruta
      */
     public List<Point> buildManhattanPath(int x1, int y1, int x2, int y2, LocalDateTime tiempoInicial, ExecutionContext estado) {
+        if (x1 == x2 && y1 == y2) {
+            return Collections.emptyList();
+        }
         List<Point> path = new ArrayList<>();
         path = findPathAStar(new Point(x1, y1), new Point(x2, y2), tiempoInicial, estado);
         if (path == null || path.isEmpty()) {
