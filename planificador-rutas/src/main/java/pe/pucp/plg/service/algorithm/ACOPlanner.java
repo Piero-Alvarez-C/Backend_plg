@@ -15,8 +15,8 @@ import java.util.stream.Collectors;
 @Service
 public class ACOPlanner {
 
-    private static final int ITERACIONES = 60; // ajustar según tus pruebas
-    private static final int HORMIGAS = 40;    // idem
+    private static final int ITERACIONES = 100; // ajustar según tus pruebas
+    private static final int HORMIGAS = 50;    // idem
     private static final double ALPHA = 1.0;
     private static final double BETA = 1.5;
     private static final double BETA_URGENCIA = 5.0; 
@@ -28,7 +28,7 @@ public class ACOPlanner {
             return Collections.emptyList();
         }
 
-        Set<Integer> idsCandidatos = candidatos.stream()
+        Set<String> idsCandidatos = candidatos.stream()
                 .map(Pedido::getId)
                 .collect(Collectors.toSet());
         contexto.getEventosEntrega().removeIf(e -> idsCandidatos.contains(e.getPedido().getId()));
@@ -111,6 +111,7 @@ public class ACOPlanner {
             return Collections.emptyList();
         }
         
+        System.out.println("Coste para mejor solucion: " + mejorCoste);
         return mejorSol != null ? mejorSol : Collections.emptyList();
     }
 
@@ -293,9 +294,21 @@ public class ACOPlanner {
     private double calcularCosteTotal(List<Ruta> sol, List<Pedido> pedidosActivos, List<CamionEstado> flota, LocalDateTime tiempoActual) {
         double costeConsumo = sol.stream().mapToDouble(r -> r.consumo).sum();
         double costeTardanza = 0;
-        final double PENALTY_POR_MINUTO_TARDE = 1000.0; // ¡Un valor muy alto para que domine!
+        double costeRiesgo = 0; // ✅ NUEVA VARIABLE PARA EL COSTO DE RIESGO
+
+        // ¡Un valor muy alto para que domine!
+        final double PENALTY_POR_MINUTO_TARDE = 1000.0; 
+        // Una penalización significativa, pero menor que la de tardanza.
+        final double PENALTY_POR_BAJA_LAXITUD = 50.0; 
 
         List<CamionEstado> flotaSimulada = deepCopyFlota(flota);
+
+        Set<Integer> indicesAsignados = new HashSet<>();
+        for (Ruta ruta : sol) {
+            for (int pedidoIdx : ruta.getPedidoIds()) {
+                indicesAsignados.add(pedidoIdx);
+            }
+        }
 
         for (Ruta ruta : sol) {
             CamionEstado camionSimulado = findCamionInList(ruta.getCamionId(), flotaSimulada);
@@ -307,15 +320,21 @@ public class ACOPlanner {
             for (int pedidoIdx : ruta.getPedidoIds()) {
                 Pedido pedido = pedidosActivos.get(pedidoIdx);
                 
-                // Simular viaje
                 int dist = Math.abs(camionSimulado.getX() - pedido.getX()) + Math.abs(camionSimulado.getY() - pedido.getY());
                 int tiempoViaje = (int) Math.ceil(dist * minPorKm);
                 
                 tiempoSimulado = tiempoSimulado.plusMinutes(tiempoViaje);
                 
                 if (tiempoSimulado.isAfter(pedido.getTiempoLimite())) {
+                    // Penalización por tardanza (esto se mantiene igual)
                     long minutosTarde = ChronoUnit.MINUTES.between(pedido.getTiempoLimite(), tiempoSimulado);
                     costeTardanza += minutosTarde * PENALTY_POR_MINUTO_TARDE;
+                } else {
+                    // ✅ NUEVO: Penalización por bajo margen de tiempo (riesgo)
+                    long laxitudEnMinutos = ChronoUnit.MINUTES.between(tiempoSimulado, pedido.getTiempoLimite());
+                    // La penalización es inversamente proporcional al margen de tiempo.
+                    // Poco margen = alta penalización. Mucho margen = penalización insignificante.
+                    costeRiesgo += PENALTY_POR_BAJA_LAXITUD / (laxitudEnMinutos + 1.0);
                 }
 
                 // Actualizar para el siguiente tramo
@@ -324,8 +343,28 @@ public class ACOPlanner {
                 tiempoSimulado = tiempoSimulado.plusMinutes(15); // Tiempo de servicio
             }
         }
-        return costeConsumo + costeTardanza;
+        double costePorAbandono = 0;
+        final double PENALTY_POR_PEDIDO_URGENTE_NO_ASIGNADO = 100000.0; 
+
+        // Iteramos sobre todos los pedidos que debían ser planificados
+        for (int i = 0; i < pedidosActivos.size(); i++) {
+            // Si el índice de este pedido NO está en el set de asignados...
+            if (!indicesAsignados.contains(i)) {
+                Pedido pedidoNoAsignado = pedidosActivos.get(i);
+                
+                // Calculamos cuánto tiempo le queda
+                long minutosRestantes = ChronoUnit.MINUTES.between(tiempoActual, pedidoNoAsignado.getTiempoLimite());
+
+                // Si le quedan menos de 7 horas (420 minutos), aplicamos la penalización
+                if (minutosRestantes < 420) {
+                    costePorAbandono += PENALTY_POR_PEDIDO_URGENTE_NO_ASIGNADO;
+                }
+            }
+        }
+
+        return costeConsumo + costeTardanza + costePorAbandono + costeRiesgo;
     }
+
     // ------------------------------------------------------------
     // 8) Buscar un camión en una flota por su id
     // ------------------------------------------------------------

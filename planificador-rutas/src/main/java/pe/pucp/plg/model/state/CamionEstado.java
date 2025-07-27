@@ -72,6 +72,9 @@ public class CamionEstado {
     private String tipoAveriaActual = null; // T1, T2, T3 o null si no hay avería
     private boolean enTaller = false; // Indica si el camión está en taller tras una avería tipo T2 o T3
 
+    // --- Para sincronización --- 
+    private double progresoMovimiento;
+
     public CamionEstado(CamionTemplate plantilla, int initialX, int initialY) {
         this.plantilla = Objects.requireNonNull(plantilla, "La plantilla del camión no puede ser nula.");
         this.x = initialX;
@@ -105,6 +108,7 @@ public class CamionEstado {
         this.tiempoLibre = original.tiempoLibre;
         this.tiempoLibreAveria = original.tiempoLibreAveria;
         this.tipoAveriaActual = original.tipoAveriaActual;
+        this.progresoMovimiento = original.progresoMovimiento;
     }
     
     // Getters
@@ -132,6 +136,7 @@ public class CamionEstado {
     public double getCombustibleGastado() { return combustibleGastado; }
     public String getTipoAveriaActual() { return tipoAveriaActual; }
     public boolean isEnTaller() { return enTaller; }
+    public double getProgresoMovimiento() { return progresoMovimiento; }
 
     public List<Point> getRutaBackup() { return rutaBackup; }
     public List<Pedido> getPedidosBackup() { return pedidosBackup; }
@@ -158,6 +163,7 @@ public class CamionEstado {
     public void setCombustibleGastado(double combustible) { this.combustibleGastado = combustible; }
     public void setTipoAveriaActual(String tipo) { this.tipoAveriaActual = tipo; }
     public void setEnTaller(boolean enTaller) { this.enTaller = enTaller; }
+    public void setProgresoMovimiento(double progreso) { this.progresoMovimiento = progreso; }
 
     public void setRutaBackup(List<Point> r) { this.rutaBackup = r; }
     public void setPedidosBackup(List<Pedido> p) { this.pedidosBackup = p; }

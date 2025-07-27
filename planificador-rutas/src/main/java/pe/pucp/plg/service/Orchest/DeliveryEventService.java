@@ -33,7 +33,7 @@ public class DeliveryEventService {
 
         // Mientras haya eventos en la cola Y el siguiente evento sea para AHORA
         while (!contexto.getEventosEntrega().isEmpty() && 
-            contexto.getEventosEntrega().peek().time.equals(tiempoActual)) {
+            !contexto.getEventosEntrega().peek().time.isAfter(tiempoActual)) {
 
             // Saca el evento de la cola
             EntregaEvent ev = contexto.getEventosEntrega().poll();
@@ -63,7 +63,7 @@ public class DeliveryEventService {
 
             // CASO B: El evento es una LLEGADA al cliente
             if (camion.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
-                System.out.printf("➡️  LLEGADA: Camión %s llegó a pedido %d en %s. Inicia servicio.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                System.out.printf("➡️  LLEGADA: Camión %s llegó a pedido %s en %s. Inicia servicio.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
                 
                 camion.setX(pedido.getX());
                 camion.setY(pedido.getY());
@@ -77,7 +77,7 @@ public class DeliveryEventService {
             } 
             // CASO C: El evento es un FIN DE SERVICIO
             else if (camion.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE) {
-                System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %d en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %s en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
                 
                 double antes = camion.getCapacidadDisponible();
                 camion.setCapacidadDisponible(antes - pedido.getVolumen());
@@ -100,7 +100,7 @@ public class DeliveryEventService {
                             contexto
                     );
                     //int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
-                    int tt = ruta.size(); 
+                    int tt = ruta.size();
                     camion.setRuta(ruta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
@@ -122,8 +122,8 @@ public class DeliveryEventService {
                     camion.setRuta(ruta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                    //camion.getHistory().addAll(ruta);
-                    int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    //int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    int tt = ruta.size();
                     camion.setTiempoLibre(tiempoActual.plusMinutes(tt + TIEMPO_SERVICIO));
                     nuevosEventos.add(new EntregaEvent(tiempoActual.plusMinutes(tt), camion.getPlantilla().getId(), siguiente));
                 } else {
@@ -167,8 +167,6 @@ public class DeliveryEventService {
         }
         c.setRuta(camino);
         c.setPasoActual(0);
-        //c.getHistory().addAll(camino);
-
     }
 
     

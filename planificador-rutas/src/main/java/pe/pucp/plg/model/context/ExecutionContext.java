@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ExecutionContext {
 
     private AtomicInteger pedidoSeq = new AtomicInteger(1000);
-    public int generateUniquePedidoId() {
-        return pedidoSeq.getAndIncrement();
+    public String generateUniquePedidoId() {
+        return String.valueOf(pedidoSeq.getAndIncrement());
     }
     // 1) Estados de la flota
     private List<CamionEstado> camiones = new ArrayList<>();

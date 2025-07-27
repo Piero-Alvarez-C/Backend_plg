@@ -49,137 +49,137 @@ public class PlanningService {
             System.out.println("Se está replanificando...");
 
             // A) cancelar y desprogramar — sólo si hay camiones
-            Set<Integer> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
+            Set<String> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
             contexto.getEventosEntrega().removeIf(ev -> ev.getPedido()!=null && ids.contains(ev.getPedido().getId()));
             candidatos.forEach(p -> {
                 p.setProgramado(false);
                 p.setHoraEntregaProgramada(null);
                 });
 
-            //candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
-            // B) Desvío local con búsqueda del mejor camión
+            if (!flotaEstado.isEmpty()) {
+                List<Ruta> rutasACO = acoPlanner.planificarRutas(candidatos, flotaEstado, tiempoActual, contexto);
+                aplicarRutas(tiempoActual, rutasACO, candidatos, contexto);
+                contexto.setRutas(rutasACO);
+            }
+
+            /*List<Pedido> pedidosParaDesvio = candidatos.stream()
+                .filter(p -> !p.isProgramado())
+                .collect(Collectors.toList());
+
             List<Pedido> sinAsignar = new ArrayList<>();
-            for (Pedido p : candidatos) {
-                CamionEstado mejor = null;
-                int mejorDist = Integer.MAX_VALUE;
-                // Encuentra el mejor camión para desvío
-                for (CamionEstado c : contexto.getCamiones()) {
-                    if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE || c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) continue;
-                    if (c.getCapacidadDisponible() < p.getVolumen()) continue;
-                    int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
-                    if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
-                        mejor = c;
-                        mejorDist = dist;
-                    }
-                }
-                if (mejor != null) {
-                    // 1) Backup de ruta original
-                    mejor.setRutaBackup(new ArrayList<>(mejor.getRutaActual()));
-                    mejor.setPedidosBackup(new ArrayList<>(mejor.getPedidosCargados()));
-                    mejor.setPedidoDesvio(p);
-
-                    // 2) Insertar en pendientes
-                    int idx = posicionOptimaDeInsercion(mejor, p, tiempoActual, contexto);
-                    mejor.getPedidosCargados().add(idx, p);
-                    p.setProgramado(true);
-
-                    // A) Si está AVAILABLE → entrega directa
-                    if (mejor.getStatus() == CamionEstado.TruckStatus.AVAILABLE) {
-                        List<Point> ruta = pathfindingService.buildManhattanPath(
-                                mejor.getX(), mejor.getY(),
-                                p.getX(), p.getY(),
-                                tiempoActual,
-                                contexto
-                        );
-                        int tt       = (int)Math.ceil(ruta.size() * (60.0 / 50.0));
-                        LocalDateTime tLlegada = tiempoActual.plusMinutes(tt);
-                        mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                        mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
-                        mejor.setRuta(ruta);
-                        mejor.setPasoActual(0);
-
-                        // limpiar TODOS los eventos pendientes de este camión
-                        CamionEstado cam = mejor;
-                        if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
-                            contexto.getEventosEntrega()
-                                    .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
+                
+            if(!pedidosParaDesvio.isEmpty()) {
+                for (Pedido p : pedidosParaDesvio) {
+                    CamionEstado mejor = null;
+                    int mejorDist = Integer.MAX_VALUE;
+                    // Encuentra el mejor camión para desvío
+                    for (CamionEstado c : contexto.getCamiones()) {
+                        if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE || c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) continue;
+                        if (c.getCapacidadDisponible() < p.getVolumen()) continue;
+                        int dist = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
+                        if (esDesvioValido(c, p, tiempoActual, contexto) && dist < mejorDist) {
+                            mejor = c;
+                            mejorDist = dist;
                         }
-
-                        // Se crea el nuevo evento para el desvío
-                        contexto.getEventosEntrega()
-                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
-
-                        // programar SOLO el evento de llegada
-                        contexto.getEventosEntrega()
-                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
                     }
-                    // B) Si ya está DELIVERING → replan parcial
-                    else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN || mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
+                    if (mejor != null) {
+                        // 1) Backup de ruta original
+                        mejor.setRutaBackup(new ArrayList<>(mejor.getRutaActual()));
+                        mejor.setPedidosBackup(new ArrayList<>(mejor.getPedidosCargados()));
+                        mejor.setPedidoDesvio(p);
 
-                        // SI ESTABA RETURNING
-                        if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
-                            for(TanqueDinamico t : contexto.getTanques()) {
-                                if (t.getPosX() == mejor.getTanqueDestinoRecarga().getPosX() &&
-                                    t.getPosY() == mejor.getTanqueDestinoRecarga().getPosY()) {
-                                    t.setDisponible(t.getDisponible() + mejor.getPlantilla().getCapacidadCarga() - mejor.getCapacidadDisponible());
-                                    break;
-                                }
+                        // 2) Insertar en pendientes
+                        int idx = posicionOptimaDeInsercion(mejor, p, tiempoActual, contexto);
+                        mejor.getPedidosCargados().add(idx, p);
+                        p.setProgramado(true);
+
+                        // A) Si está AVAILABLE → entrega directa
+                        if (mejor.getStatus() == CamionEstado.TruckStatus.AVAILABLE) {
+                            List<Point> ruta = pathfindingService.buildManhattanPath(
+                                    mejor.getX(), mejor.getY(),
+                                    p.getX(), p.getY(),
+                                    tiempoActual,
+                                    contexto
+                            );
+                            //int tt       = (int)Math.ceil(ruta.size() * (60.0 / 50.0));
+                            int tt       = ruta.size();
+                            LocalDateTime tLlegada = tiempoActual.plusMinutes(tt);
+                            mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                            mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
+                            mejor.setRuta(ruta);
+                            mejor.setPasoActual(0);
+
+                            // limpiar TODOS los eventos pendientes de este camión
+                            CamionEstado cam = mejor;
+                            if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
+                                contexto.getEventosEntrega()
+                                        .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
                             }
-                            mejor.setEnRetorno(false);
-                            mejor.setReabastecerEnTanque(null);
+
+                            // Se crea el nuevo evento para el desvío
+                            contexto.getEventosEntrega()
+                                    .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
                         }
-                        // calcular camino al desvío
-                        List<Point> caminoDesvio = pathfindingService.buildManhattanPath(
-                                mejor.getX(), mejor.getY(),
-                                p.getX(), p.getY(),
-                                tiempoActual,
-                                contexto
-                        );
-                        if (caminoDesvio == null) {
-                            sinAsignar.add(p);
-                            continue;
+                        // B) Si ya está DELIVERING → replan parcial
+                        else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN || mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
+
+                            // SI ESTABA RETURNING
+                            if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
+                                for(TanqueDinamico t : contexto.getTanques()) {
+                                    if (t.getPosX() == mejor.getTanqueDestinoRecarga().getPosX() &&
+                                        t.getPosY() == mejor.getTanqueDestinoRecarga().getPosY()) {
+                                        t.setDisponible(t.getDisponible() + mejor.getPlantilla().getCapacidadCarga() - mejor.getCapacidadDisponible());
+                                        break;
+                                    }
+                                }
+                                mejor.setEnRetorno(false);
+                                mejor.setReabastecerEnTanque(null);
+                            }
+                            // calcular camino al desvío
+                            List<Point> caminoDesvio = pathfindingService.buildManhattanPath(
+                                    mejor.getX(), mejor.getY(),
+                                    p.getX(), p.getY(),
+                                    tiempoActual,
+                                    contexto
+                            );
+                            if (caminoDesvio == null) {
+                                sinAsignar.add(p);
+                                continue;
+                            }
+
+                            // tiempo de llegada al desvío
+                            //int tt = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                            int tt = caminoDesvio.size();
+                            LocalDateTime tLlegada   = tiempoActual.plusMinutes(tt);
+                            // mantengo camión en DELIVERING y bloqueado hasta fin de servicio
+                            mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                            mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
+
+
+                            mejor.getRutaActual().clear();
+                            mejor.setRuta(new ArrayList<>(caminoDesvio));
+                            mejor.setPasoActual(0);
+                            //mejor.getHistory().addAll(caminoDesvio);
+
+                            // limpiar TODOS los eventos pendientes de este camión
+                            CamionEstado cam = mejor;
+                            if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
+                                contexto.getEventosEntrega()
+                                        .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
+                            }
+
+                            // programar SOLO el evento de llegada al pedido desviado
+                            contexto.getEventosEntrega()
+                                    .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
+
                         }
 
-                        // tiempo de llegada al desvío
-                        int tt = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
-                        LocalDateTime tLlegada   = tiempoActual.plusMinutes(tt);
-                        // mantengo camión en DELIVERING y bloqueado hasta fin de servicio
-                        mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                        mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
-
-
-                        mejor.getRutaActual().clear();
-                        mejor.setRuta(new ArrayList<>(caminoDesvio));
-                        mejor.setPasoActual(0);
-                        //mejor.getHistory().addAll(caminoDesvio);
-
-                        // limpiar TODOS los eventos pendientes de este camión
-                        CamionEstado cam = mejor;
-                        contexto.getEventosEntrega()
-                                .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
-
-                        // programar SOLO el evento de llegada al pedido desviado
-                        contexto.getEventosEntrega()
-                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
-
+                    } else {
+                        sinAsignar.add(p);
                     }
-
-                } else {
-                    sinAsignar.add(p);
                 }
-            }
+            }*/
 
-
-            // C) El resto va al ACO habitual
-            if (!sinAsignar.isEmpty()) {
-                /*System.out.printf("📦 ACO recibe pedidos sin asignar: %s%n",
-                        sinAsignar.stream().map(Pedido::getId).collect(Collectors.toList()));*/
-                sinAsignar.removeIf(p -> p.isProgramado() || p.isAtendido());
-                List<Ruta> rutas = acoPlanner.planificarRutas(sinAsignar, flotaEstado, tiempoActual, contexto);
-
-                aplicarRutas(tiempoActual, rutas, sinAsignar, contexto);
-                contexto.setRutas(rutas);
-            }
         }   
         return tiempoActual;
     }
@@ -246,7 +246,8 @@ public class PlanningService {
                 // 1) Si venía retornando, cancela el evento de retorno y limpia estado
                 if (camion.getStatus() == CamionEstado.TruckStatus.RETURNING) {
                     for(TanqueDinamico t : contexto.getTanques()) {
-                        if (t.getPosX() == camion.getTanqueDestinoRecarga().getPosX() &&
+                        if(camion.getTanqueDestinoRecarga() != null &&
+                            t.getPosX() == camion.getTanqueDestinoRecarga().getPosX() &&
                             t.getPosY() == camion.getTanqueDestinoRecarga().getPosY()) {
                             t.setDisponible(t.getDisponible() + camion.getPlantilla().getCapacidadCarga() - camion.getCapacidadDisponible());
                             break;
@@ -291,7 +292,8 @@ public class PlanningService {
 
                         // 2) Programa el evento de entrega
                         // ── PARCHE: programar fin de servicio del pedido desviado ──
-                        int ttDesvio = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                        //int ttDesvio = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                        int ttDesvio = caminoDesvio.size();
                         LocalDateTime finServicio = tiempoActual.plusMinutes(ttDesvio + TIEMPO_SERVICIO);
                         // No cambiar el estado si el camión está averiado
                             camion.setStatus(CamionEstado.TruckStatus.DELIVERING);

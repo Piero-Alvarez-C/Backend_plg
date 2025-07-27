@@ -12,6 +12,7 @@ import pe.pucp.plg.model.state.TanqueDinamico;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MapperUtil {
@@ -68,7 +69,12 @@ public class MapperUtil {
     public static PedidoDTO toPedidoDTO(Pedido pedido) {
         PedidoDTO dto = new PedidoDTO();
         dto.setId(pedido.getId());
-        dto.setIdCliente("C" + String.format("%03d", pedido.getId()));
+        
+        String idCompleto = pedido.getId();
+        String idBase = idCompleto.contains("-") ? idCompleto.split("-")[0] : idCompleto;
+        int idNumerico = Integer.parseInt(idBase);
+        dto.setIdCliente("C" + String.format("%03d", idNumerico));
+
         dto.setX(pedido.getX());
         dto.setY(pedido.getY());
         dto.setTiempoCreacion(pedido.getTiempoCreacion());
@@ -132,14 +138,52 @@ public class MapperUtil {
         SimulacionSnapshotDTO s = new SimulacionSnapshotDTO();
         s.setTiempoActual(estado.getCurrentTime());
         s.setCamiones(estado.getCamiones().stream()
-                .map(camion -> toCamionDTO(camion)).toList()); 
-        s.setPedidos(estado.getPedidos().stream()
-                .map(MapperUtil::toPedidoDTO).toList());
+                .map(MapperUtil::toCamionDTO).toList()); 
+        
+        // --- LÓGICA DE CONSOLIDACIÓN DE PEDIDOS ---
+
+        // 1. Agrupa todos los sub-pedidos por su ID original (la parte antes del "-")
+        Map<String, List<Pedido>> pedidosAgrupados = estado.getPedidos().stream()
+            .collect(Collectors.groupingBy(p -> {
+                String id = p.getId();
+                // Esto extrae el ID base, ej: "123-0" -> "123"
+                return id.contains("-") ? id.split("-")[0] : id;
+            }));
+
+        // 2. Convierte cada grupo en un único PedidoDTO consolidado
+        List<PedidoDTO> pedidosConsolidados = pedidosAgrupados.values().stream()
+            .map(subPedidos -> {
+                // Usa el primer sub-pedido como plantilla para los datos comunes
+                Pedido plantilla = subPedidos.get(0);
+                
+                // Suma el volumen de todos los sub-pedidos del grupo
+                double volumenTotal = subPedidos.stream()
+                                                .mapToDouble(Pedido::getVolumen)
+                                                .sum();
+
+                // Crea el DTO consolidado
+                PedidoDTO dto = MapperUtil.toPedidoDTO(plantilla); // Copia los datos base
+                dto.setVolumen(volumenTotal); // Sobrescribe con el volumen total
+                dto.setId(plantilla.getId().split("-")[0]); // Usa el ID base limpio
+
+                // (Opcional) Determina un estado representativo para el grupo
+                boolean estaProgramado = subPedidos.stream().anyMatch(Pedido::isProgramado);
+                boolean estaEnEntrega = subPedidos.stream().anyMatch(Pedido::isEnEntrega);
+                dto.setProgramado(estaProgramado);
+                dto.setEnEntrega(estaEnEntrega);
+
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+        s.setPedidos(pedidosConsolidados);
+
+        // --- FIN DE LA LÓGICA DE CONSOLIDACIÓN ---
+
         s.setBloqueos(estado.getBloqueosActivos().stream()
                 .map(MapperUtil::toBloqueoDTO).toList());
         s.setTanques(estado.getTanques().stream()
                 .map(MapperUtil::toTanqueDTO).toList());
-                
         s.setAverias(
                 estado.getAveriasPorTurno().entrySet().stream()
                         .flatMap(turnoEntry -> turnoEntry.getValue().entrySet().stream()
@@ -152,14 +196,9 @@ public class MapperUtil {
                                 })
                         ).toList());
 
-
-        // For RutaDTO, we now map camionId. If full CamionEstadoDTO is needed here,
-        // it would require looking up CamionEstado from ExecutionContext based on camionId.
-        // For simplicity, RutaDTO in snapshot will contain camionId.
-        //s.setRutas(estado.getRutas().stream()
-        //        .map(MapperUtil::toRutaDTO).toList());
         return s;
     }
+
     public static AveriaDTO toAveriaDTO(Averia averia) {
         AveriaDTO dto = new AveriaDTO();
         dto.setTipoIncidente(averia.getTipoIncidente());

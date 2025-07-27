@@ -12,6 +12,7 @@ import pe.pucp.plg.model.state.TanqueDinamico;
 public class FleetService {
     
     private final int TIEMPO_SERVICIO = 15;
+    private static final double MINUTOS_POR_PASO = 1;
 
     public CamionEstado findCamion(String camionId, ExecutionContext estado) {
         return estado.getCamiones().stream()
@@ -21,56 +22,46 @@ public class FleetService {
 
     public void avanzar(ExecutionContext contexto, LocalDateTime tiempoActual) {
         for (CamionEstado c : contexto.getCamiones()) {
-            // 0) Está averiado => no procesar en absoluto
-            if (c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE) {
-                // Camión averiado, no se procesa en ningún caso
-                continue;
-            }
-            
-            // 1) Está descargando/recargando => no avanza
-            if (c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE){
+            if (c.getStatus() == CamionEstado.TruckStatus.BREAKDOWN || 
+                c.getStatus() == CamionEstado.TruckStatus.MAINTENANCE || 
+                c.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE) {
                 continue;
             }
 
-            // 2) Mover camiones que están en ruta (entregando o retornando)
-            if (c.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
-                if (c.tienePasosPendientes()) {
-                    c.avanzarUnPaso();
+            // Lógica de movimiento para DELIVERING y RETURNING
+            if ((c.getStatus() == CamionEstado.TruckStatus.DELIVERING || c.getStatus() == CamionEstado.TruckStatus.RETURNING) && c.tienePasosPendientes()) {
+                
+                // El camión acumula 1 minuto de "esfuerzo" de movimiento
+                c.setProgresoMovimiento(c.getProgresoMovimiento() + 1.0);
+
+                // Solo si ha acumulado suficiente "esfuerzo" (1.2 min), avanza un paso
+                if (c.getProgresoMovimiento() >= MINUTOS_POR_PASO) {
+                    c.avanzarUnPaso(); // Mueve el camión 1 km
                     contexto.setTotalDistanciaRecorrida(contexto.getTotalDistanciaRecorrida() + 1);
+                    
+                    // Se resta el costo del movimiento, guardando el progreso sobrante.
+                    c.setProgresoMovimiento(c.getProgresoMovimiento() - MINUTOS_POR_PASO);
                 }
             }
 
-            // Lógica de retorno (sin avance, que ya se hizo arriba)
-            if (c.getStatus() == CamionEstado.TruckStatus.RETURNING) {
-                if (c.tienePasosPendientes()) {
-                    c.avanzarUnPaso();
-                    contexto.setTotalDistanciaRecorrida(contexto.getTotalDistanciaRecorrida() + 1);
-                } else {
-                    // llegó al depósito: programa recarga 15'
-                    c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
-                    c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
-                    c.setCombustibleDisponible(c.getPlantilla().getCapacidadCombustible()); 
-                    c.setTiempoLibre(tiempoActual.plusMinutes(TIEMPO_SERVICIO));
-                    c.getPedidosCargados().clear();
-                    for(TanqueDinamico t : contexto.getTanques()) {
-                        if (t.getPosX() == c.getX() && t.getPosY() == c.getY()) {
-                            if(t.equals(contexto.getTanques().get(0))) {
-                                c.setTiempoLibre(tiempoActual);
-                            }
-                            c.setTanqueOrigen(t);
-                            break;
-                        }
+            if (c.getStatus() == CamionEstado.TruckStatus.RETURNING && !c.tienePasosPendientes()) {
+                c.setStatus(CamionEstado.TruckStatus.AVAILABLE);
+                c.setCapacidadDisponible(c.getPlantilla().getCapacidadCarga());
+                c.setCombustibleDisponible(c.getPlantilla().getCapacidadCombustible()); 
+                c.setTiempoLibre(tiempoActual.plusMinutes(TIEMPO_SERVICIO));
+                c.getPedidosCargados().clear();
+                c.setProgresoMovimiento(0.0); // Resetea el progreso al llegar
 
+                // Identifica el tanque de llegada y lo establece como el nuevo posible origen
+                for(TanqueDinamico t : contexto.getTanques()) {
+                    if (t.getPosX() == c.getX() && t.getPosY() == c.getY()) {
+                        if(t.equals(contexto.getTanques().get(0))) { // Si llega a la planta principal
+                            c.setTiempoLibre(tiempoActual); // Puede que no necesite tiempo de recarga
+                        }
+                        c.setTanqueOrigen(t);
+                        break;
                     }
                 }
-                continue;
-            }
-
-            // 3) Ruta de entrega/desvío
-            if (c.getStatus() == CamionEstado.TruckStatus.DELIVERING
-                    && c.tienePasosPendientes()) {
-                //c.avanzarUnPaso();
-                continue;
             }
 
         }

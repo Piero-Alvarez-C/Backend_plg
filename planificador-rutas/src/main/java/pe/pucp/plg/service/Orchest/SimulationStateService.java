@@ -93,7 +93,7 @@ public class SimulationStateService {
                 // 🛠️ Dividir en sub-pedidos de ≤ capacidadMaxCamion
                 while (volumenRestante > 0) {
                     double vol = Math.min(capacidadMaxCamion, volumenRestante);
-                    int subId = contexto.generateUniquePedidoId();
+                    String subId = p.getId() + "-" + pedidosAInyectar.size(); 
                     Pedido sub = new Pedido(
                             subId,
                             tiempoActual,

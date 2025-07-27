@@ -73,7 +73,7 @@ public class OperationService {
         }
 
         // Ensure the pedido has a unique ID if not already set
-        if (nuevoPedido.getId() == 0) { // Assuming 0 or a specific value indicates a new, ID-less pedido
+        if (nuevoPedido.getId() == null) { // Assuming 0 or a specific value indicates a new, ID-less pedido
             nuevoPedido.setId(operationalContext.generateUniquePedidoId());
         }
 
@@ -151,7 +151,7 @@ public class OperationService {
         if (operationalContext == null) {
             throw new IllegalStateException("Operational context is not available.");
         }
-        int id = operationalContext.generateUniquePedidoId();
+        String id = operationalContext.generateUniquePedidoId();
         Pedido nuevo = new Pedido(id,
                 operationalContext.getCurrentTime(), // Use operational context's current time
                 dto.getX(), dto.getY(),
