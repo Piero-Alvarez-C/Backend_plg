@@ -29,6 +29,7 @@ public class DeliveryEventService {
     
      // 2) Disparar eventos de entrega programados para este minuto
     public void triggerScheduledDeliveries(LocalDateTime tiempoActual, ExecutionContext contexto) {
+
         List<EntregaEvent> nuevosEventos = new ArrayList<>();
 
         // Mientras haya eventos en la cola Y el siguiente evento sea para AHORA
@@ -37,7 +38,13 @@ public class DeliveryEventService {
 
             // Saca el evento de la cola
             EntregaEvent ev = contexto.getEventosEntrega().poll();
-            
+            // ——— 2) Log de procesamiento de cada evento ——————————
+            System.out.printf(
+                "⌛ Procesando EntregaEvent → camión=%s pedido=%s programado para %s%n",
+                ev.getCamionId(),
+                ev.getPedido() != null ? ev.getPedido().getId() : "RETORNO",
+                ev.time
+            );
             // Compara el valor del tiempo, no la referencia del objeto
             if (!ev.time.equals(tiempoActual)) {
                 continue;
@@ -77,6 +84,12 @@ public class DeliveryEventService {
             } 
             // CASO C: El evento es un FIN DE SERVICIO
             else if (camion.getStatus() == CamionEstado.TruckStatus.UNAVAILABLE) {
+                // ——— 3) Log de liberación —————————————
+                System.out.printf(
+                    "✅ Entrega evento → camión=%s pedido=%s liberado en t=%s%n", camion.getPlantilla().getId(),
+                    pedido.getId(),
+                    tiempoActual
+                );
                 System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %d en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
                 
                 double antes = camion.getCapacidadDisponible();

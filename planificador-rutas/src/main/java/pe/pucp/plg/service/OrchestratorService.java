@@ -95,9 +95,14 @@ public class OrchestratorService {
         fleetService.avanzar(contexto, tiempoActual);
         // 2) Disparar eventos de entrega programados para este minuto
         eventService.triggerScheduledDeliveries(tiempoActual, contexto);
-
         stateService.inyectarPedidos(contexto, tiempoActual, replanificar);
 
+        // Detectar si hay pedidos NUEVOS en este minuto y forzar replanificación
+        //boolean hayNuevos = contexto.getPedidos().stream().anyMatch(p -> p.getTiempoCreacion().equals(tiempoActual));
+        //if (hayNuevos) {
+        //    replanificar = true;
+            //System.out.printf("Pedido nuevo en t=%s → replanificar inmediato%n", tiempoActual);
+        //}
         if ((countReplan % INTERVALO_REPLAN == 0 || countReplan == INTERVALO_REPLAN) && !replanificar) { 
             System.out.println("Replanificando");   
             replanificar = true;
@@ -140,18 +145,30 @@ public class OrchestratorService {
                 System.out.printf("Ningún camión disponible (ni en ventana) → replanificación pospuesta%n",
                                     tiempoActual);
             }
-            replanificar = false;
+            //replanificar = false;
         }
 
         // 9) Determinar candidatos a replanificar
         List<Pedido> pendientes = contexto.getPedidos().stream()
                 .filter(p -> !p.isAtendido() && !p.isDescartado() && !p.isProgramado() && p.getTiempoCreacion().isBefore(tiempoActual))
                 .collect(Collectors.toList());
-
+        pendientes.sort(Comparator.comparing(Pedido::getTiempoLimite));
         List<Pedido> candidatos = pendientes;
+        System.out.printf(
+                "⏲️ Replanificando en t=%s → camionesDisponibles=%d, pedidosPendientes=%d%n",
+                tiempoActual,
+                flotaEstado.size(),
+                candidatos.size()
+        );
         // 10) Replanificación ACO si procede
         planningService.replanificar(contexto, flotaEstado, candidatos, tiempoActual, replanificar);
-
+        System.out.printf(
+                "⏲️  stepOneMinute t=%s → flotaDisponibles=%d, pedidosPendientes=%d, replan=%s%n",
+                tiempoActual,
+                flotaEstado.size(),
+                candidatos.size(),
+                replanificar
+        );
         stateService.actualizarPedidosPorTanque(contexto);
 
         EventDTO estadoActual = EventDTO.of(EventType.SNAPSHOT, MapperUtil.toSnapshotDTO(contexto));

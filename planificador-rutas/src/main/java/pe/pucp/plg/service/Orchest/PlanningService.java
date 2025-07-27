@@ -91,7 +91,7 @@ public class PlanningService {
                                 tiempoActual,
                                 contexto
                         );
-                        int tt       = (int)Math.ceil(ruta.size() * (60.0 / 50.0));
+                        int tt       = ruta.size();
                         LocalDateTime tLlegada = tiempoActual.plusMinutes(tt);
                         mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
                         mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
@@ -109,9 +109,6 @@ public class PlanningService {
                         contexto.getEventosEntrega()
                                 .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
 
-                        // programar SOLO el evento de llegada
-                        contexto.getEventosEntrega()
-                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
                     }
                     // B) Si ya está DELIVERING → replan parcial
                     else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN || mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
@@ -142,7 +139,7 @@ public class PlanningService {
                         }
 
                         // tiempo de llegada al desvío
-                        int tt = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                        int tt = caminoDesvio.size();
                         LocalDateTime tLlegada   = tiempoActual.plusMinutes(tt);
                         // mantengo camión en DELIVERING y bloqueado hasta fin de servicio
                         mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
@@ -293,7 +290,7 @@ public class PlanningService {
 
                         // 2) Programa el evento de entrega
                         // ── PARCHE: programar fin de servicio del pedido desviado ──
-                        int ttDesvio = (int) Math.ceil(caminoDesvio.size() * (60.0 / 50.0));
+                        int ttDesvio = caminoDesvio.size();
                         LocalDateTime finServicio = tiempoActual.plusMinutes(ttDesvio + TIEMPO_SERVICIO);
                         // No cambiar el estado si el camión está averiado
                             camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
