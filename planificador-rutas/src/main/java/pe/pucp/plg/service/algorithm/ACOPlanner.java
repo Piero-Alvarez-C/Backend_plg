@@ -294,12 +294,14 @@ public class ACOPlanner {
     private double calcularCosteTotal(List<Ruta> sol, List<Pedido> pedidosActivos, List<CamionEstado> flota, LocalDateTime tiempoActual) {
         double costeConsumo = sol.stream().mapToDouble(r -> r.consumo).sum();
         double costeTardanza = 0;
-        double costeRiesgo = 0; // ✅ NUEVA VARIABLE PARA EL COSTO DE RIESGO
+        double costeRiesgo = 0; 
+        double costePorAdelantarse = 0;
 
         // ¡Un valor muy alto para que domine!
         final double PENALTY_POR_MINUTO_TARDE = 1000.0; 
         // Una penalización significativa, pero menor que la de tardanza.
         final double PENALTY_POR_BAJA_LAXITUD = 50.0; 
+        final double PENALTY_POR_ENTREGA_TEMPRANA = 0.1;
 
         List<CamionEstado> flotaSimulada = deepCopyFlota(flota);
 
@@ -330,11 +332,11 @@ public class ACOPlanner {
                     long minutosTarde = ChronoUnit.MINUTES.between(pedido.getTiempoLimite(), tiempoSimulado);
                     costeTardanza += minutosTarde * PENALTY_POR_MINUTO_TARDE;
                 } else {
-                    // ✅ NUEVO: Penalización por bajo margen de tiempo (riesgo)
                     long laxitudEnMinutos = ChronoUnit.MINUTES.between(tiempoSimulado, pedido.getTiempoLimite());
-                    // La penalización es inversamente proporcional al margen de tiempo.
-                    // Poco margen = alta penalización. Mucho margen = penalización insignificante.
                     costeRiesgo += PENALTY_POR_BAJA_LAXITUD / (laxitudEnMinutos + 1.0);
+                    if (laxitudEnMinutos > 720) { 
+                        costePorAdelantarse += (laxitudEnMinutos - 720) * PENALTY_POR_ENTREGA_TEMPRANA;
+                    }
                 }
 
                 // Actualizar para el siguiente tramo
@@ -362,7 +364,7 @@ public class ACOPlanner {
             }
         }
 
-        return costeConsumo + costeTardanza + costePorAbandono + costeRiesgo;
+        return costeConsumo + costeTardanza + costePorAbandono + costeRiesgo + costePorAdelantarse;
     }
 
     // ------------------------------------------------------------
