@@ -34,7 +34,7 @@ public class DeliveryEventService {
 
         // Mientras haya eventos en la cola Y el siguiente evento sea para AHORA
         while (!contexto.getEventosEntrega().isEmpty() && 
-            contexto.getEventosEntrega().peek().time.equals(tiempoActual)) {
+            !contexto.getEventosEntrega().peek().time.isAfter(tiempoActual)) {
 
             // Saca el evento de la cola
             EntregaEvent ev = contexto.getEventosEntrega().poll();
@@ -136,7 +136,8 @@ public class DeliveryEventService {
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
                     //camion.getHistory().addAll(ruta);
-                    int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    //int tt = (int) Math.ceil(ruta.size() * (60.0/50.0));
+                    int tt = ruta.size();
                     camion.setTiempoLibre(tiempoActual.plusMinutes(tt + TIEMPO_SERVICIO));
                     nuevosEventos.add(new EntregaEvent(tiempoActual.plusMinutes(tt), camion.getPlantilla().getId(), siguiente));
                 } else {
@@ -167,7 +168,6 @@ public class DeliveryEventService {
         int destY = mejorT != null ? mejorT.getPosY() : dy;
         if (mejorT != null) {
             mejorT.setDisponible(mejorT.getDisponible() - falta);
-            c.setTanqueOrigen(mejorT);
         }
         c.setStatus(CamionEstado.TruckStatus.RETURNING);
 

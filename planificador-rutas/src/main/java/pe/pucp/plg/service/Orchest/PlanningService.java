@@ -124,7 +124,6 @@ public class PlanningService {
                             }
                             mejor.setEnRetorno(false);
                             mejor.setReabastecerEnTanque(null);
-                            mejor.setTanqueOrigen(mejor.getTanqueOrigenBackup());
                         }
                         // calcular camino al desvío
                         List<Point> caminoDesvio = pathfindingService.buildManhattanPath(
@@ -259,7 +258,6 @@ public class PlanningService {
                     camion.getPedidosCargados().clear();
                     
                     camion.setReabastecerEnTanque(null);
-                    camion.setTanqueOrigen(camion.getTanqueOrigenBackup());
                 }
 
                 // 2) Encolar y programar un solo desvío
@@ -330,17 +328,6 @@ public class PlanningService {
                     camion.setRuta(rutaCompleta);
                     camion.setPasoActual(0);
                     camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                    //camion.getHistory().addAll(rutaCompleta);
-
-                    TanqueDinamico tanqueDePartida = contexto.getTanques().stream()
-                        .filter(t -> t.getPosX() == camion.getX() && t.getPosY() == camion.getY())
-                        .findFirst()
-                        .orElse(contexto.getTanques().get(0)); // Por defecto, la planta principal
-
-                    // FIJAR el origen y el backup ANTES de que el camión se mueva
-                    camion.setTanqueOrigen(tanqueDePartida);
-                    camion.setTanqueOrigenBackup(tanqueDePartida); // El backup es igual al origen al inicio
-
 
                     incidentService.calcularPuntosAveria(camion, contexto);
 

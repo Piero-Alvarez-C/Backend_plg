@@ -55,7 +55,6 @@ public class SimulationManagerService {
 
         for(CamionEstado c : this.operationalContext.getCamiones()) {
             c.setTanqueOrigen(this.operationalContext.getTanques().get(0)); // Asignar la planta
-            c.setTanqueOrigenBackup(this.operationalContext.getTanques().get(0)); // Asignar la planta como backup
         }
 
         // 3. Initialize Pedidos from ResourceLoader
@@ -69,10 +68,6 @@ public class SimulationManagerService {
                 .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
                 .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         System.out.println("Total de pedidos para completar el  día: " + pedidosPorTiempo.size());
-        for (Map.Entry<LocalDateTime, List<Pedido>> entry : pedidosPorTiempo.entrySet()) {
-            LocalDateTime fechaHora = entry.getKey();
-            List<Pedido> pedidos = entry.getValue();
-        }
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
 
         // Pedidos exactamente en startTime (mismo instante)
@@ -127,8 +122,6 @@ public class SimulationManagerService {
 
         for(CamionEstado c : this.activeSimulationContext.getCamiones()) {
             c.setTanqueOrigen(this.activeSimulationContext.getTanques().get(0)); // Asignar la planta
-            c.setTanqueOrigenBackup(this.activeSimulationContext.getTanques().get(0)); // Asignar la planta como backup
-            System.out.println("Tanque origen backup para camion " + c.getPlantilla().getId() + ": " + c.getTanqueOrigenBackup().getId());
         }
 
         // Initialize Pedidos from PedidoRepository for the new simulation context
