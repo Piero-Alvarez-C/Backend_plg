@@ -86,35 +86,72 @@ public class PlanningService {
                     p.setProgramado(true);
 
                     /// A) Si está AVAILABLE → entrega directa
+                    // A) Si está AVAILABLE → replan completo con todos sus pedidosCargados
                     if (mejor.getStatus() == CamionEstado.TruckStatus.AVAILABLE) {
-                        List<Point> ruta = pathfindingService.buildManhattanPath(
-                                mejor.getX(), mejor.getY(),
-                                p.getX(), p.getY(),
-                                tiempoActual,
-                                contexto
-                        );
-                        int tt = ruta.size();
-                        LocalDateTime tLlegada = tiempoActual.plusMinutes(tt);
-                        // Calculamos el fin de servicio
-                        LocalDateTime finServicio = tLlegada.plusMinutes(TIEMPO_SERVICIO);
+                        // 1) Incluir el nuevo pedido en la carga del camión
+                        mejor.getPedidosCargados().add(p);
+                        p.setProgramado(true);
 
-                        mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                        mejor.setTiempoLibre(finServicio);
-                        mejor.setRuta(ruta);
-                        mejor.setPasoActual(0);
-
-                        // Limpiar TODOS los eventos pendientes de este camión
-                        // limpiar TODOS los eventos pendientes de este camión
-                        CamionEstado cam = mejor;
-                        if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
-                            contexto.getEventosEntrega()
-                                    .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
+                        // 2) Construir la ruta completa y calcular el tiempo de entrega acumulado
+                        List<Point> rutaCompleta = new ArrayList<>();
+                        LocalDateTime scheduleTime = tiempoActual;
+                        int cx = mejor.getX(), cy = mejor.getY();
+                        for (Pedido q : mejor.getPedidosCargados()) {
+                            // calcular segmento (respetando caso misma posición)
+                            if (cx != q.getX() || cy != q.getY()) {
+                                List<Point> seg = pathfindingService.buildManhattanPath(
+                                        cx, cy, q.getX(), q.getY(),
+                                        scheduleTime, contexto
+                                );
+                                // si seg es null, podrías saltar este pedido
+                                if (seg != null) {
+                                    rutaCompleta.addAll(seg);
+                                    scheduleTime = scheduleTime.plusMinutes(seg.size());
+                                }
+                            }
+                            // sumar tiempo de servicio
+                            scheduleTime = scheduleTime.plusMinutes(TIEMPO_SERVICIO);
+                            // avanzar posición
+                            cx = q.getX();
+                            cy = q.getY();
                         }
 
-                        // Ahora creamos el evento con finServicio, no con tLlegada
-                        contexto.getEventosEntrega().add(
-                                new EntregaEvent(finServicio, mejor.getPlantilla().getId(), p)
+                        // 3) Configurar el camión con la ruta multi‐parada
+                        mejor.setRuta(rutaCompleta);
+                        mejor.setPasoActual(0);
+                        mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                        mejor.setTiempoLibre(scheduleTime);
+
+                        // 4) Limpiar eventos previos sin capturar 'mejor' en el lambda
+                        final String camionId = mejor.getPlantilla().getId();
+                        contexto.getEventosEntrega().removeIf(ev ->
+                                ev.getCamionId().equals(camionId)
                         );
+
+                        // 5) Programar un EntregaEvent para cada parada, en orden
+                        scheduleTime = tiempoActual;
+                        cx = mejor.getX();
+                        cy = mejor.getY();
+                        for (Pedido q : mejor.getPedidosCargados()) {
+                            // calcular viaje
+                            if (cx != q.getX() || cy != q.getY()) {
+                                List<Point> seg = pathfindingService.buildManhattanPath(
+                                        cx, cy, q.getX(), q.getY(),
+                                        scheduleTime, contexto
+                                );
+                                if (seg != null) {
+                                    scheduleTime = scheduleTime.plusMinutes(seg.size());
+                                }
+                            }
+                            // evento de llegada
+                            contexto.getEventosEntrega().add(
+                                    new EntregaEvent(scheduleTime, camionId, q)
+                            );
+                            // tiempo de servicio
+                            scheduleTime = scheduleTime.plusMinutes(TIEMPO_SERVICIO);
+                            cx = q.getX();
+                            cy = q.getY();
+                        }
                     }
 
                     // B) Si ya está DELIVERING → replan parcial
