@@ -13,6 +13,7 @@ import pe.pucp.plg.model.context.ExecutionContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors; 
 
 import pe.pucp.plg.util.MapperUtil;
@@ -141,9 +142,42 @@ public class OperationService {
         if (operationalContext.getPedidos() == null) {
             return new ArrayList<>();
         }
-        return operationalContext.getPedidos().stream()
-                .map(MapperUtil::toPedidoDTO)
-                .collect(Collectors.toList());
+
+        Map<String, List<Pedido>> pedidosAgrupados = operationalContext.getPedidos().stream()
+            .collect(Collectors.groupingBy(p -> {
+                String id = p.getId();
+                // Esto extrae el ID base, ej: "123-0" -> "123"
+                return id.contains("-") ? id.split("-")[0] : id;
+            }));
+
+        // 2. Convierte cada grupo en un único PedidoDTO consolidado
+        List<PedidoDTO> pedidosConsolidados = pedidosAgrupados.values().stream()
+            .map(subPedidos -> {
+                // Usa el primer sub-pedido como plantilla para los datos comunes
+                Pedido plantilla = subPedidos.get(0);
+                
+                // Suma el volumen de todos los sub-pedidos del grupo
+                double volumenTotal = subPedidos.stream()
+                                                .mapToDouble(Pedido::getVolumen)
+                                                .sum();
+
+                // Crea el DTO consolidado
+                PedidoDTO dto = MapperUtil.toPedidoDTO(plantilla); // Copia los datos base
+                dto.setVolumen(volumenTotal); // Sobrescribe con el volumen total
+                dto.setId(plantilla.getId().split("-")[0]); // Usa el ID base limpio
+
+                // (Opcional) Determina un estado representativo para el grupo
+                boolean estaProgramado = subPedidos.stream().anyMatch(Pedido::isProgramado);
+                boolean estaEnEntrega = subPedidos.stream().anyMatch(Pedido::isEnEntrega);
+                dto.setProgramado(estaProgramado);
+                dto.setEnEntrega(estaEnEntrega);
+
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+
+        return pedidosConsolidados;
     }
 
     public Pedido crearNuevoPedidoOperacional(PedidoDTO dto) { // Added method
