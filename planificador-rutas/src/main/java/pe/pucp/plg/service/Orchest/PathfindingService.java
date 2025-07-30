@@ -43,7 +43,7 @@ public class PathfindingService {
         }
     }
     
-    private List<Point> findPathAStar(Point start, Point end, LocalDateTime startTime, ExecutionContext estado) {
+    public List<Point> findPathAStar(Point start, Point end, LocalDateTime startTime, ExecutionContext estado) {
         PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparingInt(node -> node.fCost));
         Set<Point> closedSet = new HashSet<>();
         Map<Point, Node> allNodes = new HashMap<>();

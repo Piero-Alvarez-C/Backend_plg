@@ -1,10 +1,8 @@
 package pe.pucp.plg.service.Orchest;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.awt.Point;
 
@@ -56,7 +54,11 @@ public class PlanningService {
                 p.setHoraEntregaProgramada(null);
                 });
 
-            //candidatos.sort(Comparator.comparing(Pedido::getTiempoLimite));
+            // 1) Asigna urgentes (≤ 2h) vía método
+            asignarPedidosUrgentes(candidatos, contexto, tiempoActual);
+
+            // 2) Elimina los urgentes de candidatos
+            candidatos.removeIf(p -> p.isProgramado());
             // B) Desvío local con búsqueda del mejor camión
             List<Pedido> sinAsignar = new ArrayList<>();
             for (Pedido p : candidatos) {
@@ -83,7 +85,7 @@ public class PlanningService {
                     mejor.getPedidosCargados().add(idx, p);
                     p.setProgramado(true);
 
-                    // A) Si está AVAILABLE → entrega directa
+                    /// A) Si está AVAILABLE → entrega directa
                     if (mejor.getStatus() == CamionEstado.TruckStatus.AVAILABLE) {
                         List<Point> ruta = pathfindingService.buildManhattanPath(
                                 mejor.getX(), mejor.getY(),
@@ -91,13 +93,17 @@ public class PlanningService {
                                 tiempoActual,
                                 contexto
                         );
-                        int tt       = ruta.size();
+                        int tt = ruta.size();
                         LocalDateTime tLlegada = tiempoActual.plusMinutes(tt);
+                        // Calculamos el fin de servicio
+                        LocalDateTime finServicio = tLlegada.plusMinutes(TIEMPO_SERVICIO);
+
                         mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
-                        mejor.setTiempoLibre(tLlegada.plusMinutes(TIEMPO_SERVICIO));
+                        mejor.setTiempoLibre(finServicio);
                         mejor.setRuta(ruta);
                         mejor.setPasoActual(0);
 
+                        // Limpiar TODOS los eventos pendientes de este camión
                         // limpiar TODOS los eventos pendientes de este camión
                         CamionEstado cam = mejor;
                         if (cam.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE) {
@@ -105,13 +111,14 @@ public class PlanningService {
                                     .removeIf(ev -> ev.getCamionId().equals(cam.getPlantilla().getId()));
                         }
 
-                        // Se crea el nuevo evento para el desvío
-                        contexto.getEventosEntrega()
-                                .add(new EntregaEvent(tLlegada, cam.getPlantilla().getId(), p));
-
+                        // Ahora creamos el evento con finServicio, no con tLlegada
+                        contexto.getEventosEntrega().add(
+                                new EntregaEvent(finServicio, mejor.getPlantilla().getId(), p)
+                        );
                     }
+
                     // B) Si ya está DELIVERING → replan parcial
-                    else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN || mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
+                    else if (mejor.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && mejor.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
 
                         // SI ESTABA RETURNING
                         if(mejor.getStatus() == CamionEstado.TruckStatus.RETURNING && mejor.getTanqueDestinoRecarga() != null) {
@@ -180,7 +187,79 @@ public class PlanningService {
         }   
         return tiempoActual;
     }
-    
+    private void asignarPedidosUrgentes(List<Pedido> candidatos,
+                                        ExecutionContext contexto,
+                                        LocalDateTime tiempoActual) {
+        // 1) Filtrar pedidos urgentes (≤ 2 h restantes)
+        List<Pedido> urgentes = candidatos.stream()
+                .filter(p -> Duration.between(tiempoActual, p.getTiempoLimite()).toHours() <= 2)
+                .collect(Collectors.toList());
+
+        // 2) Para cada urgente, encontrar el camión con menor tiempo de viaje real
+        for (Pedido p : urgentes) {
+            CamionEstado mejorCamion = null;
+            List<Point> mejorRuta = null;
+            int mejorTiempo = Integer.MAX_VALUE;
+
+            for (CamionEstado c : contexto.getCamiones()) {
+                // Sólo camiones libres y con suficiente capacidad
+                if (c.getStatus() != CamionEstado.TruckStatus.AVAILABLE) continue;
+                if (c.getCapacidadDisponible() < p.getVolumen()) continue;
+                if (!esDesvioValido(c, p, tiempoActual, contexto)) continue;
+
+                // -- CASO ESPECIAL: mismo punto --
+                Point origen  = new Point(c.getX(), c.getY());
+                Point destino = new Point(p.getX(), p.getY());
+                List<Point> ruta;
+                int travelTime;
+                if (origen.equals(destino)) {
+                    // Pedido en el almacén, no hay desplazamiento
+                    ruta       = Collections.emptyList();
+                    travelTime = 0;
+                } else {
+                    // Ruta normal con A* (considera bloqueos)
+                    ruta = pathfindingService.findPathAStar(
+                            origen, destino, tiempoActual, contexto
+                    );
+                    if (ruta == null) {
+                        // no hay ruta válida; saltamos este camión
+                        continue;
+                    }
+                    travelTime = ruta.size();
+                }
+
+                // Comparar y quedarnos con el camión más rápido
+                if (travelTime < mejorTiempo) {
+                    mejorTiempo = travelTime;
+                    mejorCamion = c;
+                    mejorRuta   = ruta;
+                }
+            }
+
+            // 3) Si encontramos un camión, programar la entrega urgente
+            if (mejorCamion != null && mejorRuta != null) {
+                LocalDateTime llegada     = tiempoActual.plusMinutes(mejorTiempo);
+                LocalDateTime finServicio = llegada.plusMinutes(TIEMPO_SERVICIO);
+
+                mejorCamion.setRuta(mejorRuta);
+                mejorCamion.setPasoActual(0);
+                mejorCamion.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                // Descontar volumen
+                mejorCamion.setCapacidadDisponible(
+                        mejorCamion.getCapacidadDisponible() - p.getVolumen()
+                );
+                mejorCamion.setTiempoLibre(finServicio);
+                mejorCamion.getPedidosCargados().add(p);
+
+                p.setProgramado(true);
+                p.setHoraEntregaProgramada(finServicio);
+
+                contexto.getEventosEntrega().add(
+                        new EntregaEvent(finServicio, mejorCamion.getPlantilla().getId(), p)
+                );
+            }
+        }
+    }
     public void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto) {
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
         if (rutas.isEmpty()) {
@@ -199,7 +278,15 @@ public class PlanningService {
                 }
                 if (mejor != null) {
                     // Asignación simple: construye ruta directa y programa entrega
-                    List<Point> path = pathfindingService.buildManhattanPath(mejor.getX(), mejor.getY(), p.getX(), p.getY(), tiempoActual, contexto);
+                    Point origen  = new Point(mejor.getX(), mejor.getY());
+                    Point destino = new Point(p.getX(), p.getY());
+                    List<Point> path;
+                    if (origen.equals(destino)) {
+                        path = Collections.emptyList();
+                    } else {
+                        path = pathfindingService.buildManhattanPath(mejor.getX(), mejor.getY(), p.getX(), p.getY(), tiempoActual, contexto);
+                    }
+
                     mejor.setRuta(path);    
                     mejor.setPasoActual(0);
                     mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
@@ -273,13 +360,23 @@ public class PlanningService {
                     // — reservo espacio —
                     camion.setCapacidadDisponible(camion.getCapacidadDisponible() - p.getVolumen());
 
-                    // — construyo sólo el tramo de desvío y encolo en rutaPendiente —
-                    List<Point> caminoDesvio = pathfindingService.buildManhattanPath(
-                            camion.getX(), camion.getY(),
-                            p.getX(), p.getY(),
-                            tiempoActual,
-                            contexto
-                    );
+                    // — construyo sólo el tramo de desvío con chequeo “misma posición” —
+                    Point origen  = new Point(camion.getX(), camion.getY());
+                    Point destino = new Point(p.getX(),      p.getY());
+                    List<Point> caminoDesvio;
+                    if (origen.equals(destino)) {
+                        // Pedido en el mismo punto: ruta vacía
+                        caminoDesvio = Collections.emptyList();
+                    } else {
+                        // Llamada normal al pathfinder
+                        caminoDesvio = pathfindingService.buildManhattanPath(
+                                camion.getX(), camion.getY(),
+                                p.getX(), p.getY(),
+                                tiempoActual,
+                                contexto
+                        );
+                    }
+
                     if (caminoDesvio != null && camion.getStatus() != CamionEstado.TruckStatus.BREAKDOWN && camion.getStatus() != CamionEstado.TruckStatus.MAINTENANCE) {
                         // 1) Reemplaza la ruta actual por el tramo de desvío
                         camion.getRutaActual().clear();
@@ -302,7 +399,7 @@ public class PlanningService {
                         p.setProgramado(true);
                         incidentService.calcularPuntosAveria(camion, contexto);
                     }
-                    break;
+                    //break;
                 }
 
             } else {
@@ -336,23 +433,114 @@ public class PlanningService {
                     cx = camion.getX();
                     cy = camion.getY();
                     for (Pedido p : camion.getPedidosCargados()) {
-                        int pasos = pathfindingService.buildManhattanPath(cx, cy, p.getX(), p.getY(), horaProximaAccion, contexto).size();
-                        
-                        // Calculate the arrival time for this specific stop
+                        // — PATCH: chequeo “misma posición” antes de llamar al pathfinder —
+                        Point origen  = new Point(cx, cy);
+                        Point destino = new Point(p.getX(), p.getY());
+                        List<Point> seg;
+                        if (origen.equals(destino)) {
+                            seg = Collections.emptyList();
+                        } else {
+                            seg = pathfindingService.buildManhattanPath(
+                                    cx, cy,
+                                    p.getX(), p.getY(),
+                                    tiempoActual, contexto
+                            );
+                        }
+
+                        // si seg == null, podrías saltarte o tratarlo, pero con cero-distancia no es null
+                        if (seg != null) {
+                            rutaCompleta.addAll(seg);
+                        }
+
+                        cx = p.getX();
+                        cy = p.getY();
+                    }
+
+                    camion.setRuta(rutaCompleta);
+                    camion.setPasoActual(0);
+                    camion.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                    incidentService.calcularPuntosAveria(camion, contexto);
+
+                    // 3) Programar un EntregaEvent secuencial para cada pedido
+                    horaProximaAccion = tiempoActual;
+                    cx = camion.getX();
+                    cy = camion.getY();
+                    for (Pedido p : camion.getPedidosCargados()) {
+                        // — PATCH: mismo chequeo para calcular pasos —
+                        Point origen2  = new Point(cx,    cy);
+                        Point destino2 = new Point(p.getX(), p.getY());
+                        int pasos;
+                        if (origen2.equals(destino2)) {
+                            pasos = 0;
+                        } else {
+                            pasos = pathfindingService.buildManhattanPath(
+                                    cx, cy,
+                                    p.getX(), p.getY(),
+                                    horaProximaAccion, contexto
+                            ).size();
+                        }
+
                         LocalDateTime horaLlegada = horaProximaAccion.plusMinutes(pasos);
-                        
-                        // Schedule the ARRIVAL event
-                        contexto.getEventosEntrega().add(new EntregaEvent(horaLlegada, camion.getPlantilla().getId(), p));
+                        contexto.getEventosEntrega().add(
+                                new EntregaEvent(horaLlegada, camion.getPlantilla().getId(), p)
+                        );
                         p.setHoraEntregaProgramada(horaLlegada);
 
-                        // The next leg of the journey can only start after this service is complete
                         horaProximaAccion = horaLlegada.plusMinutes(TIEMPO_SERVICIO);
-                        
-                        // Update the starting point for the next iteration
                         cx = p.getX();
                         cy = p.getY();
                     }
                 }
+            }
+        }
+        // C) Fallback: asignar los pedidos que ACO no programó
+        Set<Integer> pedidosAsignados = rutas.stream()
+                .flatMap(r -> r.getPedidoIds().stream())
+                .collect(Collectors.toSet());
+
+        for (Pedido p : activos) {
+            if (p.isProgramado() || pedidosAsignados.contains(p.getId())) continue;
+
+            CamionEstado mejor = null;
+            int distMin = Integer.MAX_VALUE;
+            for (CamionEstado c : contexto.getCamiones()) {
+                if (c.getStatus() != CamionEstado.TruckStatus.AVAILABLE) continue;
+                if (c.getCapacidadDisponible() < p.getVolumen()) continue;
+                int d = Math.abs(c.getX() - p.getX()) + Math.abs(c.getY() - p.getY());
+                if (d < distMin) {
+                    distMin = d;
+                    mejor = c;
+                }
+            }
+
+            if (mejor != null) {
+                // — PATCH: chequeo “misma posición” antes del build —
+                Point origen3  = new Point(mejor.getX(), mejor.getY());
+                Point destino3 = new Point(p.getX(),      p.getY());
+                List<Point> path;
+                if (origen3.equals(destino3)) {
+                    path = Collections.emptyList();
+                } else {
+                    path = pathfindingService.buildManhattanPath(
+                            mejor.getX(), mejor.getY(),
+                            p.getX(), p.getY(),
+                            tiempoActual, contexto
+                    );
+                }
+
+                mejor.setRuta(path);
+                mejor.setPasoActual(0);
+                mejor.setStatus(CamionEstado.TruckStatus.DELIVERING);
+                mejor.getPedidosCargados().add(p);
+                p.setProgramado(true);
+
+                int viaje = path.size();
+                LocalDateTime fin = tiempoActual.plusMinutes(viaje + TIEMPO_SERVICIO);
+                mejor.setTiempoLibre(fin);
+                contexto.getEventosEntrega().add(
+                        new EntregaEvent(fin, mejor.getPlantilla().getId(), p)
+                );
+                p.setHoraEntregaProgramada(fin);
             }
         }
 
