@@ -217,7 +217,14 @@ public class PlanningService {
                         sinAsignar.stream().map(Pedido::getId).collect(Collectors.toList()));*/
                 sinAsignar.removeIf(p -> p.isProgramado() || p.isAtendido());
                 List<Ruta> rutas = acoPlanner.planificarRutas(sinAsignar, flotaEstado, tiempoActual, contexto);
-
+                // 📣 Logging ACO
+                System.out.println("⚙️ [ACO] Rutas generadas:");
+                for (Ruta r : rutas) {
+                    System.out.printf("   • Camión %s → pedidos: %s (total %d)%n",
+                            r.getCamionId(),
+                            r.getPedidoIds(),
+                            r.getPedidoIds().size());
+                }
                 aplicarRutas(tiempoActual, rutas, sinAsignar, contexto);
                 contexto.setRutas(rutas);
             }
@@ -298,6 +305,8 @@ public class PlanningService {
         }
     }
     public void aplicarRutas(LocalDateTime tiempoActual, List<Ruta> rutas, List<Pedido> activos, ExecutionContext contexto) {
+        // 📣 Logging pre-aplicación
+        System.out.printf("🔧 Aplicando %d rutas ACO al estado real (antes de fallback)%n", rutas.size());
         rutas.removeIf(r -> r.getPedidoIds() == null || r.getPedidoIds().isEmpty());
         if (rutas.isEmpty()) {
             // Fallback: para cada pedido pendiente, busca el camión disponible más cercano
@@ -529,6 +538,9 @@ public class PlanningService {
                     }
                 }
             }
+            System.out.printf("   ✅ Camión %s: ahora en ruta (%d paradas)%n",
+                    camion.getPlantilla().getId(),
+                    camion.getPedidosCargados().size());
         }
         // C) Fallback: asignar los pedidos que ACO no programó
         Set<Integer> pedidosAsignados = rutas.stream()

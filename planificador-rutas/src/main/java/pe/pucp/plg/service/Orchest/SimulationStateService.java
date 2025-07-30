@@ -30,7 +30,7 @@ public class SimulationStateService {
         this.maintenanceService = maintenanceService;
     }
     
-    public void accionesMediaNoche(ExecutionContext contexto, LocalDateTime tiempoActual, boolean replanificar) {
+    public boolean accionesMediaNoche(ExecutionContext contexto, LocalDateTime tiempoActual) {
         for (TanqueDinamico tq : contexto.getTanques()) {
             tq.setDisponible(tq.getCapacidadTotal());
         }
@@ -44,7 +44,7 @@ public class SimulationStateService {
         // Determinar qué día estamos y cargar datos para ese día
         LocalDate fechaActual = tiempoActual.toLocalDate();
         long diaActual = fechaActual.toEpochDay() - contexto.getFechaInicio().toEpochDay() + 1;
-        
+        boolean hayNuevos = false;
         // Solo cargamos datos nuevos si estamos dentro del período de simulación
         if (diaActual <= contexto.getDuracionDias()) {
             
@@ -64,14 +64,16 @@ public class SimulationStateService {
             }
             
             // Si hay nuevos datos, replanificar
-            if (!nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty()) {
-                replanificar = true;
-            }
+            //if (!nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty()) {
+            //    replanificar = true;
+            //}
+            hayNuevos = !nuevoPedidos.isEmpty() || !nuevoBloqueos.isEmpty();
         }
         maintenanceService.clearMaintenance(contexto);
+        return hayNuevos;
     }
 
-    public void inyectarPedidos(ExecutionContext contexto, LocalDateTime tiempoActual, boolean replanificar) {
+    public boolean inyectarPedidos(ExecutionContext contexto, LocalDateTime tiempoActual) {
         // 5) Incorporar nuevos pedidos que llegan en este minuto
         List<Pedido> nuevos = contexto.getPedidosPorTiempo().remove(tiempoActual);
         if (nuevos == null) {
@@ -114,7 +116,7 @@ public class SimulationStateService {
         // 5.b) Añadir realmente los pedidos (reemplazo de los nuevos originales)
         contexto.getPedidos().addAll(pedidosAInyectar);
 
-        if (!pedidosAInyectar.isEmpty()) replanificar = true;
+        return !pedidosAInyectar.isEmpty();
         
     }
 

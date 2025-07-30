@@ -82,7 +82,8 @@ public class OrchestratorService {
 
         // 1) Recarga de tanques intermedios cada vez que currentTime % 1440 == 0 (inicio de día)
         if (esMediaNoche) {
-            stateService.accionesMediaNoche(contexto, tiempoActual, replanificar);
+            boolean llegoMediaNoche = stateService.accionesMediaNoche(contexto, tiempoActual);
+            replanificar |= llegoMediaNoche;
         }
         countReplan++;
 
@@ -94,7 +95,8 @@ public class OrchestratorService {
         fleetService.avanzar(contexto, tiempoActual);
         // 2) Disparar eventos de entrega programados para este minuto
         eventService.triggerScheduledDeliveries(tiempoActual, contexto);
-        stateService.inyectarPedidos(contexto, tiempoActual, replanificar);
+        boolean llegóNuevo = stateService.inyectarPedidos(contexto, tiempoActual);
+        replanificar |= llegóNuevo;
 
         // Detectar si hay pedidos NUEVOS en este minuto y forzar replanificación
         //boolean hayNuevos = contexto.getPedidos().stream().anyMatch(p -> p.getTiempoCreacion().equals(tiempoActual));

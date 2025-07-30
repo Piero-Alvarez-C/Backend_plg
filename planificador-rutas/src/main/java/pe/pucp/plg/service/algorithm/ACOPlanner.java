@@ -59,16 +59,45 @@ public class ACOPlanner {
 
                 List<CamionEstado> clonedFlota = deepCopyFlota(flotaEstado);
                 List<Ruta> rutas = initRutas(clonedFlota);
-
                 while (!noAsignados.isEmpty()) {
-                    double[][] prob = calcularProbabilidades(rutas, clonedFlota, pedidosActivos, noAsignados, tau, tiempoActual);
+                    // 1) Calcular probabilidades para cada par (hormiga, pedido)
+                    double[][] prob = calcularProbabilidades(
+                            rutas, clonedFlota,
+                            pedidosActivos, noAsignados,
+                            tau, tiempoActual
+                    );
 
+                    // 2) Muestrear una pareja (camionIdx, pedidoIdx)
                     Seleccion sel = muestrearPar(prob, noAsignados);
-                    //if (sel == null) break; // No more valid assignments
+                    // Si no hay asignaciones posibles, terminamos
+                    if (sel == null) {
+                        break;
+                    }
 
-                    asignarPedidoARuta(sel.camionIdx, sel.pedidoIdx, rutas, clonedFlota, pedidosActivos, tiempoActual);
-                    noAsignados.remove(Integer.valueOf(sel.pedidoIdx));
+                    // 3) Intentar asignar el pedido al camión clonado
+                    boolean ok = asignarPedidoARuta(
+                            sel.camionIdx,
+                            sel.pedidoIdx,
+                            rutas,
+                            clonedFlota,
+                            pedidosActivos,
+                            tiempoActual
+                    );
+
+                    // 4) Sólo removemos de "noAsignados" si la asignación fue exitosa,
+                    //    o si el pedido no cabe en ningún clon.
+                    if (ok) {
+                        noAsignados.remove(Integer.valueOf(sel.pedidoIdx));
+                    } else {
+                        Pedido p = pedidosActivos.get(sel.pedidoIdx);
+                        boolean cabeEnAlguno = clonedFlota.stream()
+                                .anyMatch(c -> c.getCapacidadDisponible() >= p.getVolumen());
+                        if (!cabeEnAlguno) {
+                            noAsignados.remove(Integer.valueOf(sel.pedidoIdx));
+                        }
+                    }
                 }
+
                 soluciones.add(rutas);
             }
 
@@ -195,11 +224,20 @@ public class ACOPlanner {
     private static class Seleccion { int camionIdx, pedidoIdx; }
 
     private Seleccion muestrearPar(double[][] prob, List<Integer> noAsignados) {
+        // 1) Sumar todas las probabilidades válidas
         double total = 0;
-        for (int v = 0; v < prob.length; v++)
-            for (int idx : noAsignados)
+        for (int v = 0; v < prob.length; v++) {
+            for (int idx : noAsignados) {
                 total += prob[v][idx];
+            }
+        }
 
+        // 2) Si no hay probabilidad positiva, no quedan asignaciones factibles
+        if (total <= 0) {
+            return null;
+        }
+
+        // 3) Ruleta ponderada
         double r = Math.random() * total;
         double acumulado = 0;
         for (int v = 0; v < prob.length; v++) {
@@ -213,11 +251,9 @@ public class ACOPlanner {
                 }
             }
         }
-        // fallback
-        Seleccion s = new Seleccion();
-        s.camionIdx = 0;
-        s.pedidoIdx = noAsignados.get(0);
-        return s;
+
+        // 4) Fallback: no debería suceder si total>0
+        return null;
     }
 
     // ------------------------------------------------------------
