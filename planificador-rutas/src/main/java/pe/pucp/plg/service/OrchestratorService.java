@@ -123,7 +123,7 @@ public class OrchestratorService {
                 .filter(c -> c.getStatus() != CamionEstado.TruckStatus.UNAVAILABLE
                         && c.getStatus() != CamionEstado.TruckStatus.BREAKDOWN
                         && c.getStatus() != CamionEstado.TruckStatus.MAINTENANCE
-                        && c.getPedidosCargados().isEmpty()            // no tiene entregas encoladas
+                        && c.getCapacidadDisponible() > 0            
                         && c.getPedidoDesvio() == null)               // no está en medio de un desvío
                 .map(c -> {
                     CamionEstado est = new CamionEstado(c);
