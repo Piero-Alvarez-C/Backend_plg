@@ -16,8 +16,8 @@ public class PedidoRepository {
 
     // Agregar un solo pedido
     public void agregar(Pedido pedido) {
-        if (pedido.getId() == 0) {
-            pedido.setId(secuenciaId.getAndIncrement());
+        if (pedido.getId() == null) {
+            pedido.setId(String.valueOf(secuenciaId.getAndIncrement()));
         }
         pedidos.add(pedido);
     }
@@ -25,8 +25,8 @@ public class PedidoRepository {
     // Agregar múltiples pedidos
     public void agregarTodos(List<Pedido> nuevos) {
         for (Pedido pedido : nuevos) {
-            if (pedido.getId() == 0) {
-                pedido.setId(secuenciaId.getAndIncrement());
+            if (pedido.getId() == null) {
+                pedido.setId(String.valueOf(secuenciaId.getAndIncrement()));
             }
             pedidos.add(pedido);
         }

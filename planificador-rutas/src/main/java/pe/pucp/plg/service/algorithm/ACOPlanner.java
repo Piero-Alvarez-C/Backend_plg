@@ -27,7 +27,7 @@ public class ACOPlanner {
             return Collections.emptyList();
         }
 
-        Set<Integer> idsCandidatos = candidatos.stream()
+        Set<String> idsCandidatos = candidatos.stream()
                 .map(Pedido::getId)
                 .collect(Collectors.toSet());
         contexto.getEventosEntrega().removeIf(e -> idsCandidatos.contains(e.getPedido().getId()));

@@ -47,7 +47,7 @@ public class PlanningService {
             System.out.println("Se está replanificando...");
 
             // A) cancelar y desprogramar — sólo si hay camiones
-            Set<Integer> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
+            Set<String> ids = candidatos.stream().map(Pedido::getId).collect(Collectors.toSet());
             contexto.getEventosEntrega().removeIf(ev -> ev.getPedido()!=null && ids.contains(ev.getPedido().getId()));
             candidatos.forEach(p -> {
                 p.setProgramado(false);

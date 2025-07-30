@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 public class PedidoDTO {
 
-    private int id;
+    private String id;
     private String idCliente; // ← agrega esto
     private int x;
     private int y;
@@ -17,8 +17,8 @@ public class PedidoDTO {
     private boolean enEntrega;
 
     // Getters y Setters
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
     public String getIdCliente() { return idCliente; }
     public void setIdCliente(String idCliente) { this.idCliente = idCliente; }
