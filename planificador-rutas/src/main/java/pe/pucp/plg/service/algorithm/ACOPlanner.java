@@ -27,7 +27,7 @@ public class ACOPlanner {
             return Collections.emptyList();
         }
 
-        Set<Integer> idsCandidatos = candidatos.stream()
+        Set<String> idsCandidatos = candidatos.stream()
                 .map(Pedido::getId)
                 .collect(Collectors.toSet());
         contexto.getEventosEntrega().removeIf(e -> idsCandidatos.contains(e.getPedido().getId()));
@@ -275,6 +275,8 @@ public class ACOPlanner {
     // 7) Costo total de las rutas (suma de consumos)
     // ------------------------------------------------------------
     private double calcularCosteTotal(List<Ruta> sol) {
+        // + 100 por pedido con ventana de entrega < 90 minutos
+        // Diferencia entre el glp disponible del camion y el glp del pedido * multiplicador
         return sol.stream().mapToDouble(r -> r.consumo).sum();
     }
 

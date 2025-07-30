@@ -3,7 +3,8 @@ package pe.pucp.plg.model.common;
 import java.time.LocalDateTime;
 
 public class Pedido {
-    int id, x, y;
+    String id;
+    int x, y;
     LocalDateTime tiempoCreacion, tiempoLimite;
     double volumen;
     boolean atendido = false;
@@ -12,7 +13,7 @@ public class Pedido {
     boolean enEntrega = false;
     private LocalDateTime horaEntregaProgramada;
 
-    public Pedido(int id, LocalDateTime tiempoCreacion, int x, int y, double volumen, LocalDateTime tiempoLimite) {
+    public Pedido(String id, LocalDateTime tiempoCreacion, int x, int y, double volumen, LocalDateTime tiempoLimite) {
         this.id = id; this.tiempoCreacion = tiempoCreacion;
         this.x = x; this.y = y; this.volumen = volumen;
         this.tiempoLimite = tiempoLimite;
@@ -31,8 +32,8 @@ public class Pedido {
         this.programado = original.programado;
     }
     // → getters para la tabla de pedidos:
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
     public int getX() { return x; }
     public int getY() { return y; }
     public double getVolumen() { return volumen; }

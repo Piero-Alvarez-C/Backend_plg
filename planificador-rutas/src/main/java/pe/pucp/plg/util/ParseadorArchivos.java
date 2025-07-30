@@ -39,7 +39,8 @@ public class ParseadorArchivos {
                 // Calcular el tiempo límite sumando las horas de plazo
                 LocalDateTime tiempoLimite = tiempoCreacion.plusHours(plazoHoras);
 
-                pedidos.add(new Pedido(id++, tiempoCreacion, x, y, volumen, tiempoLimite));
+                pedidos.add(new Pedido(String.valueOf(id), tiempoCreacion, x, y, volumen, tiempoLimite));
+                id++;
             } catch (Exception e) {
                 System.err.println("⚠️ Error parseando línea PEDIDO: " + linea);
                 e.printStackTrace();

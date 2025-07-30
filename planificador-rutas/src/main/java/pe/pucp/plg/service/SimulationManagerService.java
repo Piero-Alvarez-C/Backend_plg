@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pe.pucp.plg.factory.FlotaFactory;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.repository.BloqueoRepository;
@@ -52,6 +53,10 @@ public class SimulationManagerService {
         // 2. Initialize Tanques
         this.operationalContext.setTanques(tanqueService.inicializarTanques());
 
+        for(CamionEstado c : this.operationalContext.getCamiones()) {
+            c.setTanqueOrigen(this.operationalContext.getTanques().get(0)); // Asignar la planta
+        }
+
         // 3. Initialize Pedidos from ResourceLoader
         LocalDateTime startTime = LocalDateTime.now();  // Fecha y hora actual precisa al momento de iniciar
         List<Pedido> todosLosPedidos = ResourceLoader.cargarPedidosParaFecha(LocalDate.from(startTime));
@@ -63,17 +68,6 @@ public class SimulationManagerService {
                 .filter(p -> p.getTiempoCreacion().isAfter(startTime)) // Filter out initial time pedidos for this map
                 .collect(Collectors.groupingBy(Pedido::getTiempoCreacion, TreeMap::new, Collectors.toList()));
         System.out.println("Total de pedidos para completar el  día: " + pedidosPorTiempo.size());
-        for (Map.Entry<LocalDateTime, List<Pedido>> entry : pedidosPorTiempo.entrySet()) {
-            LocalDateTime fechaHora = entry.getKey();
-            List<Pedido> pedidos = entry.getValue();
-
-            System.out.println("Fecha y hora: " + fechaHora);
-            System.out.println("Pedidos:");
-
-            for (Pedido p : pedidos) {
-                System.out.println("\tPedido en ubicación (" + p.getX() + ", " + p.getY() + "), volumen: " + p.getVolumen());
-            }
-        }
         this.operationalContext.setPedidosPorTiempo(pedidosPorTiempo);
 
         // Pedidos exactamente en startTime (mismo instante)
@@ -125,6 +119,10 @@ public class SimulationManagerService {
 
         this.activeSimulationContext.setCamiones(flotaFactory.crearNuevaFlota()); 
         this.activeSimulationContext.setTanques(tanqueService.inicializarTanques());
+
+        for(CamionEstado c : this.activeSimulationContext.getCamiones()) {
+            c.setTanqueOrigen(this.activeSimulationContext.getTanques().get(0)); // Asignar la planta
+        }
 
         // Initialize Pedidos from PedidoRepository for the new simulation context
         LocalDateTime startTime = LocalDateTime.of(2025, 1, 1, 0, 0);

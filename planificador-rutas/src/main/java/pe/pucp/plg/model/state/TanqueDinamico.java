@@ -1,10 +1,14 @@
 package pe.pucp.plg.model.state;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import pe.pucp.plg.model.template.TanqueTemplate;
 
 public class TanqueDinamico {
     private final TanqueTemplate plantilla;
     private double capacidadDisponible;
+    private List<String> pedidos = new ArrayList<>();
 
     public TanqueDinamico(TanqueTemplate plantilla) {
         this.plantilla = plantilla;
@@ -38,5 +42,17 @@ public class TanqueDinamico {
     // Method to refill the tank (e.g., daily)
     public void rellenarAlMaximo() {
         this.capacidadDisponible = this.plantilla.getCapacidadTotal();
+    }
+
+    public void setPedidos(List<String> pedidos) {
+        this.pedidos = pedidos;
+    }
+
+    public List<String> getPedidos() {
+        return pedidos;
+    }
+
+    public void addPedido(String pedido) {
+        this.pedidos.add(pedido);
     }
 }

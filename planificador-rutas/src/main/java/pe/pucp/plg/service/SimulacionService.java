@@ -9,6 +9,7 @@ import pe.pucp.plg.model.common.Bloqueo;
 import pe.pucp.plg.model.common.Pedido;
 import pe.pucp.plg.model.context.ExecutionContext;
 import pe.pucp.plg.model.control.SimulationControlState;
+import pe.pucp.plg.model.state.CamionEstado;
 import pe.pucp.plg.util.ResourceLoader;
 
 import java.time.LocalDate;
@@ -109,6 +110,10 @@ public class SimulacionService {
                 currentSimContext.getPedidosPorTiempo().remove(tiempoInicial);
             }
             
+            for(CamionEstado c : currentSimContext.getCamiones()) {
+                c.setTanqueOrigen(currentSimContext.getTanques().get(0)); // Asignar la planta
+            }
+
             // 7. Establecer los bloqueos iniciales
 
             for (Bloqueo b : bloqueosDiaUno) {
@@ -132,7 +137,7 @@ public class SimulacionService {
             status.setNombreSimulacion(nombre);
             status.setEstado("INITIALIZED"); 
             status.setAvance(0);
-    
+
             return status;
     
         } catch (Exception e) {
@@ -246,6 +251,7 @@ public class SimulacionService {
                 System.out.println("Simulación " + simulationId + " completada hasta " + context.getCurrentTime());
             } catch (Exception e) {
                 System.err.println("Error al ejecutar simulación completa: " + e.getMessage());
+                e.printStackTrace();
                 eventPublisher.publicarEventoSimulacion(simulationId, 
                     EventDTO.of(EventType.SIMULATION_ERROR, e.getMessage()));
             } finally {
