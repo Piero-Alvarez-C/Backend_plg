@@ -70,7 +70,7 @@ public class DeliveryEventService {
 
             // CASO B: El evento es una LLEGADA al cliente
             if (camion.getStatus() == CamionEstado.TruckStatus.DELIVERING) {
-                System.out.printf("➡️  LLEGADA: Camión %s llegó a pedido %d en %s. Inicia servicio.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                System.out.printf("➡️  LLEGADA: Camión %s llegó a pedido %s en %s. Inicia servicio.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
                 
                 camion.setX(pedido.getX());
                 camion.setY(pedido.getY());
@@ -90,7 +90,7 @@ public class DeliveryEventService {
                     pedido.getId(),
                     tiempoActual
                 );
-                System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %d en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
+                System.out.printf("✅ FIN SERVICIO: Camión %s completó pedido %s en %s.%n", camion.getPlantilla().getId(), pedido.getId(), tiempoActual);
                 
                 double antes = camion.getCapacidadDisponible();
                 camion.setCapacidadDisponible(antes - pedido.getVolumen());
